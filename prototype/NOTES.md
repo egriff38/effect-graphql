@@ -1,41 +1,43 @@
-# Prototype — class-based fields, crawl-derived GraphQL
+# Prototype — global augmentations over crawl-discovered class schemas
 
-## What this answers
-Can a type be declared as ONE `Schema.Class` binding, have resolvers attached with `source`
-fully inferred and **no explicit types**, and support recursive cross-type references — without
-`Schema.suspend`, without a base/wrapped split?
+## The model
+- Types are pure `Schema.Class` shape — ONE binding each, NO field annotations. They are
+  discovered by crawling the root query/mutation rpc success schemas.
+- Relationship fields are added on the provider root as a flat list of
+  `createAugment(TargetClass, Rpc.make(...), impl)`. The deriver layers them onto the
+  discovered types by GraphQL identifier.
+- `createAugment(schema, rpc, impl)` types `impl` as
+  `(self: schema.Type, ...Parameters<Rpc.ToHandlerFn<rpc>>) => ReturnType<...>` — so `self`,
+  the args, AND the return are all type-checked (the return is checked against the Rpc's
+  success schema; this caught a real `find() -> undefined` vs non-null `User` bug).
 
-Yes. The key facts (all verified by `tsc` + runtime):
-1. A field is the real `Rpc.make` (payload -> args, success -> field type).
-2. `Schema.Class` types are **nominal**, so `success: Schema.Array(Post)` referencing the bare
-   class needs **no `Schema.suspend`** and creates **no inference cycle**.
-3. `withGqlFields` is **dual**: `withGqlFields(Class, {...})` (data-first) or
-   `Class.pipe(withGqlFields({...}))` (pipeable). `source` is inferred from the class either way.
-4. Resolvers are attached **inline in the provider's `types` list**, so each type is a single
-   `class X` binding — no separate wrapped value.
-5. The deriver reads class fields from the `Declaration` AST (`typeParameters[0]` = the struct),
-   and looks resolvers up by GraphQL identifier (cross-refs reach the bare class).
-6. Void-payload fields render without parens automatically (graphql-js); only `posts(first:Int!)`
-   gets parens. So the "everything is an RPC, void => no parens" idea is free.
+## Why this shape
+- Schemas stay clean/inferred (no wrapper, no annotation) — no base/wrapped split.
+- Recursion is free: augments live in one list literal referencing already-declared classes,
+  so no const cycle forms, and classes are nominal so `success: Schema.Array(Post)` needs no
+  `Schema.suspend`.
 
-## Run
+## Run / verify
 ```
-bun run prototype                       # interactive TUI; 1-4 run queries, q quits
-bunx tsc --noEmit -p tsconfig.json      # typecheck (proves inferred `source`)
+bun run prototype                     # TUI; 1-4 run queries, q quits
+bunx tsc --noEmit -p tsconfig.json    # typecheck (proves typed self/args/return)
 ```
+Verified: tsc clean (strict + exactOptionalPropertyTypes); deep `users -> posts -> author`
+resolves; plain-only selection fires no resolvers.
 
-## Verified
-- `tsc` clean (strict + exactOptionalPropertyTypes); negative probe shows `source: User`
-  (a bogus field is a compile error), so inference is real, not `any`.
-- Deep `users -> posts -> author` resolves through the recursive graph with no suspend.
-- Plain-only selection fires no resolvers (graphql-js default resolver).
+## Open questions / risks (for the real design)
+- **No compile-time check that the augmented type exists.** `createAugment(User, ...)` keys by
+  the identifier "User" at runtime; augmenting a type not reachable by crawling silently no-ops.
+- **No field-name collision detection.** Two augments adding the same field to the same type
+  currently last-wins. Should error.
+- **Locality tradeoff (deliberate):** relationship fields live at the root, away from the type
+  definition — "what fields does User have?" means scanning the augment list. This is a
+  schema-extension / federation flavor, intentionally trading locality for clean schemas.
+- "Attached to a query directly" — current impl is global (per type). Query-scoped augments
+  (a relationship visible only through one query) are unusual for GraphQL; not implemented.
 
-## Open / not yet done (not the question)
-- The `types: [...]` list is the one bit of bookkeeping: it supplies resolver maps keyed by
-  identifier. Shapes are still discovered by crawling roots. (A global registry could remove the
-  list but adds import-order-dependent mutable state — rejected for the prototype.)
-- `R = never` on resolvers so we can `runPromise`; real lib runs them on a Runtime providing `R`.
-- Args pass through as graphql-js coerced them; real lib would `Schema.decode` the payload first.
-- Scalars only (String/Int/Boolean). No input/output polarity split, unions, enums, custom
-  scalars, errors-as-data, subscriptions yet.
-- Parked design decision: how deep the Rpc unification goes (full / root-only / tiered).
+## Still not the question
+- `R = never` on resolvers (runPromise); real lib runs on a Runtime providing R.
+- Args pass through as graphql-js coerced them; real lib would `Schema.decode` payloads.
+- Scalars only; no input/output split, unions, enums, custom scalars, errors-as-data, subs.
+- Parked: how deep the Rpc unification goes (full / root-only / tiered).

@@ -1,33 +1,20 @@
-// PROTOTYPE — throwaway domain wiring. Demonstrates: each type is ONE binding — a plain
-// Schema piped through the typed annotators `withGqlIdentifier`/`withGqlFields` — with NO
-// explicit const types and `source` fully inferred. The User<->Post recursion lives only in
-// the resolver graph (the schemas themselves are flat), and is broken by a loose
-// `Schema.suspend((): Schema.Top => Other)` back-edge — no base/wrapped split, no class.
+// PROTOTYPE — throwaway domain wiring. Schemas are pure `Schema.Class` shape (one binding each,
+// discovered by crawling the queries). Relationship fields are added as GLOBAL AUGMENTATIONS on
+// the provider root via `createAugment(Type, rpc, impl)` — `self` and args fully inferred, the
+// schema never wrapped/annotated, and recursion handled with no `Schema.suspend` (classes are
+// nominal so an augment's `success` references the bare class directly).
 
-import { Effect, HashMap, Schema } from "effect";
-import { Rpc, RpcGroup } from "effect/unstable/rpc";
-import {
-  type FieldImpl,
-  type Roots,
-  withGqlFields,
-  withGqlIdentifier,
-} from "./derive.ts";
+import { Effect, Schema } from "effect";
+import { Rpc } from "effect/unstable/rpc";
+import { createAugment, type FieldImpl, type Roots } from "./derive.ts";
 
 // ---- in-memory store -----------------------------------------------------
-interface UserRow {
-  id: string;
-  name: string;
-}
 interface PostRow {
   id: string;
   title: string;
   authorId: string;
 }
-
-const users: UserRow[] = [
-  { id: "u1", name: "Ada" },
-  { id: "u2", name: "Linus" },
-];
+const users = [{ id: "u1", name: "Ada" }, { id: "u2", name: "Linus" }];
 const posts: PostRow[] = [
   { id: "p1", title: "On Algorithms", authorId: "u1" },
   { id: "p2", title: "Notes on Engines", authorId: "u1" },
@@ -44,10 +31,7 @@ const log = (s: string) => {
   trace.push(s);
 };
 
-// ---- types: ONE binding each; resolvers co-located via withGqlFields ------
-// The schemas are flat ({id,name} / {id,title}); recursion is purely in the resolver graph.
-// The loose `Schema.suspend((): Schema.Top => Other)` anchor breaks the type cycle without
-// restating any shape — the deriver follows the thunk to the real AST at runtime.
+// ---- types: pure Schema.Class shape, ONE binding each ---------------------
 class User extends Schema.Class<User>("User")({
   id: Schema.String,
   name: Schema.String,
@@ -58,26 +42,15 @@ class Post extends Schema.Class<Post>("Post")({
   title: Schema.String,
 }) {}
 
-const withGQLField = <S extends Schema.Top, R extends Rpc.Any>(
-  schema: S,
-  r: R,
-  impl: (
-    self: S["Type"],
-    ...rest: Parameters<Rpc.ToHandlerFn<R>>
-  ) => ReturnType<Rpc.ToHandlerFn<R>>,
-) => {
-  return [schema, r, impl] as const;
+// ---- root operations (same Rpc primitive; source = <root>) ----------------
+const queryUser: FieldImpl = {
+  rpc: Rpc.make("user", { payload: { id: Schema.String }, success: User }),
+  resolve: ({ id }: { id: string }) =>
+    Effect.sync(() => {
+      log(`Query.user(id=${id})  source=<root>`);
+      return users.find((u) => u.id === id);
+    }),
 };
-withGQLField(
-  User,
-  Rpc.make("posts", {
-    payload: { first: Schema.Int },
-    success: Schema.Array(Schema.suspend(() => Post)),
-  }),
-  Effect.fn(function* (a, { first }) {
-    return [];
-  }),
-);
 
 const queryUsers: FieldImpl = {
   rpc: Rpc.make("users", { success: Schema.Array(User) }),
@@ -97,26 +70,33 @@ const createPost: FieldImpl = {
     Effect.sync(() => {
       const row: PostRow = { id: `p${posts.length + 1}`, title, authorId };
       posts.push(row);
-      log(
-        `Mutation.createPost(authorId=${authorId}, title=${JSON.stringify(title)}) -> ${row.id}`,
-      );
+      log(`Mutation.createPost(authorId=${authorId}, title=${JSON.stringify(title)}) -> ${row.id}`);
       return row;
     }),
 };
 
-// The whole provider: just the roots. Every other type is discovered by crawling.
+// Schemas are inferred from the queries above. Relationship fields are layered on here:
+// `self` is the target's decoded type, args come from the Rpc. `success` references the bare
+// class (nominal) — no suspend, no cycle, and no annotation/wrapper on the schemas themselves.
 export const roots: Roots = {
   query: { user: queryUser, users: queryUsers },
   mutation: { createPost },
   globalAugmentations: [
     createAugment(
       User,
-      Rpc.make("posts", {
-        payload: { first: Schema.Int },
-        success: Schema.Array(Schema.suspend(() => Post)),
+      Rpc.make("posts", { payload: { first: Schema.Int }, success: Schema.Array(Post) }),
+      Effect.fn(function*(self, { first }) {
+        log(`  User.posts(first=${first})  source=${self.id}`);
+        return posts.filter((p) => p.authorId === self.id).slice(0, first);
       }),
-      Effect.fn(function* (a, { first }) {
-        return [];
+    ),
+    createAugment(
+      Post,
+      Rpc.make("author", { success: User }),
+      Effect.fn(function*(self) {
+        const authorId = postRow(self.id).authorId;
+        log(`  Post.author  source=${self.id} -> looks up ${authorId}`);
+        return users.find((u) => u.id === authorId)!;
       }),
     ),
   ],
@@ -128,7 +108,7 @@ export const presetQueries: ReadonlyArray<{ label: string; query: string }> = [
     query: `{ user(id: "u1") { name posts(first: 2) { title } } }`,
   },
   {
-    label: "deep: users -> posts -> author (recursion via Schema.suspend)",
+    label: "deep: users -> posts -> author (augmentations, no suspend — classes are nominal)",
     query: `{ users { name posts(first: 1) { title author { name } } } }`,
   },
   {
