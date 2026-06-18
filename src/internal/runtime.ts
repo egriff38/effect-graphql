@@ -4,9 +4,10 @@
 // after the operation. R is satisfied by app services ∪ request services.
 
 import { Effect, Exit, Layer, ManagedRuntime, Scope } from "effect";
-import { graphql, type ExecutionResult, type GraphQLSchema } from "graphql";
+import { type DocumentNode, execute as executeDocument, type ExecutionResult, GraphQLError, type GraphQLSchema, parse, validate } from "graphql";
 import { ProviderRequest, type ProviderRequestFields } from "../ProviderRequest.ts";
 import type { RequestContextValue } from "./derive.ts";
+import { type HardeningOptions, validationRules } from "./hardening.ts";
 
 export interface ExecuteParams {
   readonly query: string;
@@ -24,10 +25,21 @@ export const makeExecutor = <AppR, ReqR, E>(
   schema: GraphQLSchema,
   appLayer: Layer.Layer<AppR, E, never>,
   requestLayer: Layer.Layer<ReqR, E, AppR | ProviderRequest>,
+  hardening?: HardeningOptions,
 ): Executor => {
   const managed = ManagedRuntime.make(appLayer);
+  const rules = validationRules(hardening);
 
   const execute = async (params: ExecuteParams): Promise<ExecutionResult> => {
+    let document: DocumentNode;
+    try {
+      document = parse(params.query);
+    } catch (error) {
+      return { errors: [error instanceof GraphQLError ? error : new GraphQLError(String(error))] };
+    }
+    const validationErrors = validate(schema, document, rules);
+    if (validationErrors.length > 0) return { errors: validationErrors };
+
     const scope = Scope.makeUnsafe();
     const requestContext = await managed.runPromise(
       Layer.build(requestLayer).pipe(
@@ -40,9 +52,9 @@ export const makeExecutor = <AppR, ReqR, E>(
       runFieldExit: (effect) => managed.runPromiseExit(Effect.provideContext(effect, requestContext)),
     };
     try {
-      return await graphql({
+      return await executeDocument({
         schema,
-        source: params.query,
+        document,
         variableValues: params.variables,
         operationName: params.operationName,
         contextValue,

@@ -9,6 +9,7 @@ import type { GraphQLSchema } from "graphql";
 import type { ProviderRequest, ProviderRequestFields } from "./ProviderRequest.ts";
 import { deriveSchema, type InternalAugment, type InternalField } from "./internal/derive.ts";
 import { type Executor, makeExecutor } from "./internal/runtime.ts";
+import type { HardeningOptions } from "./internal/hardening.ts";
 
 /** The schema-carrying part of an Rpc the constructors read (an `Rpc.make(...)` result fits). */
 export interface RpcSchemas {
@@ -85,8 +86,10 @@ export const toSchema = <AppR, ReqR, E>(provider: Provider<AppR, ReqR, E>): Grap
     augmentations: provider.config.augmentations ?? [],
   });
 
-export const toExecutor = <AppR, ReqR, E>(provider: Provider<AppR, ReqR, E>): Executor =>
-  makeExecutor(toSchema(provider), provider.config.app, provider.config.request);
+export const toExecutor = <AppR, ReqR, E>(
+  provider: Provider<AppR, ReqR, E>,
+  hardening?: HardeningOptions,
+): Executor => makeExecutor(toSchema(provider), provider.config.app, provider.config.request, hardening);
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -100,8 +103,8 @@ const asString = (value: unknown): string | undefined => (typeof value === "stri
  * bridges it to a ProviderRequest, executes through the two-tier runtime, and returns JSON.
  * The app runtime is built once when `serve` is called and reused per request.
  */
-export const serve = <AppR, ReqR, E>(provider: Provider<AppR, ReqR, E>) => {
-  const executor = toExecutor(provider);
+export const serve = <AppR, ReqR, E>(provider: Provider<AppR, ReqR, E>, hardening?: HardeningOptions) => {
+  const executor = toExecutor(provider, hardening);
   return Effect.gen(function*() {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* request.json;
