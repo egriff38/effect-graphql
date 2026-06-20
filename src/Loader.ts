@@ -6,7 +6,7 @@
 import { Effect } from "effect";
 
 export interface Loader<K, V> {
-  readonly load: (key: K) => Effect.Effect<V, unknown, never>;
+  readonly load: (key: K) => Effect.Effect<V, never, never>;
 }
 
 interface Pending<K, V> {
@@ -23,7 +23,7 @@ interface Pending<K, V> {
 export const createLoader = <K, V, E, R>(
   batch: (keys: ReadonlyArray<K>) => Effect.Effect<ReadonlyArray<V>, E, R>,
 ): Effect.Effect<Loader<K, V>, never, R> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const context = yield* Effect.context<R>();
     const cache = new Map<K, Promise<V>>();
     let queue: Array<Pending<K, V>> = [];
@@ -49,7 +49,7 @@ export const createLoader = <K, V, E, R>(
       );
     };
 
-    const load = (key: K): Effect.Effect<V, unknown, never> =>
+    const load = (key: K): Effect.Effect<V, never, never> =>
       Effect.tryPromise(() => {
         const cached = cache.get(key);
         if (cached) return cached;

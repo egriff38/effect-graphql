@@ -3,6 +3,8 @@
 // Type-system coverage here is intentionally minimal for Phase 0 (scalars/array/object/class +
 // augments); the full mapping is issue #7.
 
+import type { Rpc } from "effect/unstable/rpc";
+
 import { Cause, Effect, Exit, Schema, SchemaAST as AST } from "effect";
 import * as GQL from "graphql";
 
@@ -14,6 +16,7 @@ export interface RequestContextValue<R> {
 
 /** A field normalized for derivation: schemas + a (source, args) -> Effect runner. */
 export interface InternalField<R> {
+  readonly rpc: Rpc.Any;
   readonly payloadSchema: Schema.Codec<unknown>;
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;

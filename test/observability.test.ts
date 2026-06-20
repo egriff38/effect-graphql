@@ -20,7 +20,7 @@ describe("observability", () => {
               const span = yield* Effect.currentSpan; // present because the resolver is wrapped in a span
               spanNames.push(span.name);
               return { ok: true };
-            }),
+            }).pipe(Effect.orDie),
         }),
       },
     });
