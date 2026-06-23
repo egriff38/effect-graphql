@@ -3,15 +3,18 @@
   "type": "module",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./graphiql": "./src/graphiql.ts"
   },
   "scripts": {
+    "dev": "bun --hot examples/dev-server/main.ts",
     "prototype": "bun prototype/main.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage.enabled --coverage.include='src/**' --coverage.reporter=text"
   },
   "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.74",
     "capnweb": "^0.8.0",
     "effect": "4.0.0-beta.74",
     "graphql": "^16.9.0",

@@ -5,6 +5,7 @@
     "": {
       "name": "effect-graphql-provider",
       "dependencies": {
+        "@effect/platform-bun": "4.0.0-beta.74",
         "capnweb": "^0.8.0",
         "effect": "4.0.0-beta.74",
         "graphql": "^16.9.0",
@@ -31,6 +32,10 @@
     "@babel/types": ["@babel/types@7.29.7", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA=="],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
+
+    "@effect/platform-bun": ["@effect/platform-bun@4.0.0-beta.74", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.74" }, "peerDependencies": { "effect": "^4.0.0-beta.74" } }, "sha512-HPozsTKom3v8uGITYX+blua0wVSk/I7ak802FoX13t4zWhHfprT8I/A8VBO4SxmcDYb/izABtHBXBgEmp612MA=="],
+
+    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.85", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.20.0" }, "peerDependencies": { "effect": "^4.0.0-beta.85" } }, "sha512-JXM5f2j2L2oGxuQG12sysPJeFYKtB388BruyHb/IfxJ/5Wx8KDo3eKLRe6tmg7y7BNeZTxEb14tPKC853+mqeg=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.27.7", "", { "os": "aix", "cpu": "ppc64" }, "sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg=="],
 
