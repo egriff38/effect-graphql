@@ -13,5 +13,5 @@ export interface ProviderRequestFields {
 }
 
 export class ProviderRequest extends Context.Service<ProviderRequest, ProviderRequestFields>()(
-  "effect-graphql-provider/ProviderRequest",
+  "effect-graphql/ProviderRequest",
 ) {}

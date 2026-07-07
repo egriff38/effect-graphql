@@ -1,29 +1,63 @@
 {
-  "name": "effect-graphql-provider",
-  "type": "module",
-  "private": true,
-  "exports": {
-    ".": "./src/index.ts",
-    "./graphiql": "./src/graphiql.ts"
+  "name": "effect-graphql",
+  "version": "0.1.0",
+  "description": "Derive a GraphQL API from Effect Schema types and Effect-based resolvers.",
+  "keywords": [
+    "effect",
+    "graphql",
+    "graphql-schema",
+    "typescript",
+    "schema-first",
+    "effect-ts"
+  ],
+  "license": "MIT",
+  "author": "Eshin Griffith",
+  "homepage": "https://github.com/egriff38/effect-graphql",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/egriff38/effect-graphql.git"
   },
+  "bugs": {
+    "url": "https://github.com/egriff38/effect-graphql/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./graphiql": {
+      "types": "./dist/graphiql.d.ts",
+      "default": "./dist/graphiql.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun --hot examples/dev-server/main.ts",
     "prototype": "bun prototype/main.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage.enabled --coverage.include='src/**' --coverage.reporter=text"
+    "test:coverage": "vitest run --coverage.enabled --coverage.include='src/**' --coverage.reporter=text",
+    "build": "tsdown",
+    "prepublishOnly": "bun run typecheck && bun run test && bun run build",
+    "release": "./release.sh"
   },
-  "dependencies": {
-    "@effect/platform-bun": "4.0.0-beta.74",
-    "capnweb": "^0.8.0",
-    "effect": "4.0.0-beta.74",
-    "graphql": "^16.9.0",
-    "ws": "^8.21.0"
+  "peerDependencies": {
+    "effect": "^4.0.0-beta.74",
+    "graphql": "^16.9.0"
   },
   "devDependencies": {
+    "@effect/platform-bun": "4.0.0-beta.74",
     "@types/node": "^25.9.3",
-    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "3.2.6",
+    "effect": "4.0.0-beta.74",
+    "graphql": "^16.9.0",
+    "tsdown": "^0.22.3",
     "typescript": "^5.6.0",
     "vitest": "^3.2.0"
   }

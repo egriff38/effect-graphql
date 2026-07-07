@@ -1,4 +1,4 @@
-# effect-graphql-provider
+# effect-graphql
 
 A library for defining a GraphQL API from effect `Schema` types and Effect-based resolvers, and serving it.
 

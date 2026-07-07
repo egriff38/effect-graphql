@@ -13,7 +13,7 @@
  *
  * Imported as a subpath so a build that doesn't use it never resolves this file:
  *
- *   import { graphiql } from "effect-graphql-provider/graphiql"
+ *   import { graphiql } from "effect-graphql/graphiql"
  */
 
 import { HttpServerResponse } from "effect/unstable/http";
@@ -71,7 +71,7 @@ const renderPage = (
  * @example
  * ```ts
  * import { HttpRouter } from "effect/unstable/http"
- * import { graphiql } from "effect-graphql-provider/graphiql"
+ * import { graphiql } from "effect-graphql/graphiql"
  *
  * HttpRouter.add("GET", "/graphiql", graphiql({ endpoint: "/graphql" }))
  * ```

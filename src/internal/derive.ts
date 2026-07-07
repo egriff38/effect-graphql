@@ -85,7 +85,7 @@ const scalarFor = (ast: AST.AST): GQL.GraphQLScalarType | undefined => {
   if (ann?.scalar) return ann.scalar;
   if (ann?.id) {
     if (!AST.isString(ast)) {
-      throw new Error("effect-graphql-provider: `graphql: { id: true }` can only annotate a String schema");
+      throw new Error("effect-graphql: `graphql: { id: true }` can only annotate a String schema");
     }
     return GQL.GraphQLID;
   }
@@ -131,7 +131,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
   const enumCache = new Map<string, GQL.GraphQLEnumType>();
   const enumFor = (ast: AST.Union): GQL.GraphQLEnumType => {
     const name = AST.resolveIdentifier(ast);
-    if (!name) throw new Error("effect-graphql-provider: enum (Literals) needs an `identifier` annotation");
+    if (!name) throw new Error("effect-graphql: enum (Literals) needs an `identifier` annotation");
     const hit = enumCache.get(name);
     if (hit) return hit;
     const values: GQL.GraphQLEnumValueConfigMap = {};
@@ -168,13 +168,13 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
     if (AST.isSuspend(a)) return inputType(a.thunk());
     const struct = structOf(a);
     if (struct) return inputObjectFor(a, struct);
-    throw new Error(`effect-graphql-provider: unsupported input ast '${a._tag}'`);
+    throw new Error(`effect-graphql: unsupported input ast '${a._tag}'`);
   };
 
   const inputObjectCache = new Map<string, GQL.GraphQLInputObjectType>();
   const inputObjectFor = (nameAst: AST.AST, struct: AST.Objects): GQL.GraphQLInputObjectType => {
     const id = AST.resolveIdentifier(nameAst);
-    if (!id) throw new Error("effect-graphql-provider: input object schema has no `identifier` annotation");
+    if (!id) throw new Error("effect-graphql: input object schema has no `identifier` annotation");
     // input types are distinct from output objects; default name is `{Id}Input`.
     const name = readGraphQL(nameAst)?.name ?? (id.endsWith("Input") ? id : `${id}Input`);
     const hit = inputObjectCache.get(name);
@@ -204,7 +204,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
     if (AST.isSuspend(a)) return outputType(a.thunk());
     const struct = structOf(a);
     if (struct) return objectTypeFor(a, struct);
-    throw new Error(`effect-graphql-provider: unsupported output ast '${a._tag}'`);
+    throw new Error(`effect-graphql: unsupported output ast '${a._tag}'`);
   };
 
   const fieldFromInternal = (
@@ -249,7 +249,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
     struct: AST.Objects,
   ): GQL.GraphQLInterfaceType => {
     const name = AST.resolveIdentifier(nameAst);
-    if (!name) throw new Error("effect-graphql-provider: interface schema has no `identifier` annotation");
+    if (!name) throw new Error("effect-graphql: interface schema has no `identifier` annotation");
     const hit = interfaceCache.get(name);
     if (hit) return hit;
     const iface = new GQL.GraphQLInterfaceType({
@@ -290,7 +290,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
     struct: AST.Objects,
   ): GQL.GraphQLObjectType<unknown, RequestContextValue<R>> => {
     const name = AST.resolveIdentifier(nameAst);
-    if (!name) throw new Error("effect-graphql-provider: reachable object schema has no `identifier` annotation");
+    if (!name) throw new Error("effect-graphql: reachable object schema has no `identifier` annotation");
     const hit = cache.get(name);
     if (hit) return hit;
     materialized.add(name);
@@ -303,13 +303,13 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
         const ifaceStruct = structOf(ifaceAst);
         if (!ifaceStruct) {
           throw new Error(
-            `effect-graphql-provider: 'implements' entry for '${name}' is not a class/struct schema`,
+            `effect-graphql: 'implements' entry for '${name}' is not a class/struct schema`,
           );
         }
         const ifaceAnn = readGraphQL(ifaceAst);
         if (!ifaceAnn?.interface) {
           throw new Error(
-            `effect-graphql-provider: 'implements' entry on '${name}' references a schema without 'graphql: { interface: true }'`,
+            `effect-graphql: 'implements' entry on '${name}' references a schema without 'graphql: { interface: true }'`,
           );
         }
         interfaces.push(interfaceTypeFor(ifaceAst, ifaceStruct));
@@ -335,7 +335,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
           if (aug.fieldName in fields) {
             const origin = plainNames.has(aug.fieldName) ? "the base schema" : "another augment";
             throw new Error(
-              `effect-graphql-provider: augment on type '${name}' collides on field '${aug.fieldName}' (already defined by ${origin})`,
+              `effect-graphql: augment on type '${name}' collides on field '${aug.fieldName}' (already defined by ${origin})`,
             );
           }
           fields[aug.fieldName] = fieldFromInternal(aug.fieldName, aug.field);
@@ -359,13 +359,13 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
   const unionCache = new Map<string, GQL.GraphQLUnionType>();
   const unionFor = (ast: AST.Union): GQL.GraphQLUnionType => {
     const name = AST.resolveIdentifier(ast);
-    if (!name) throw new Error("effect-graphql-provider: union needs an `identifier` annotation");
+    if (!name) throw new Error("effect-graphql: union needs an `identifier` annotation");
     const hit = unionCache.get(name);
     if (hit) return hit;
     const tagToName = new Map<string, string>();
     const types = ast.types.map((memberAst) => {
       const struct = structOf(memberAst);
-      if (!struct) throw new Error(`effect-graphql-provider: union '${name}' has a non-object member`);
+      if (!struct) throw new Error(`effect-graphql: union '${name}' has a non-object member`);
       const objectType = objectTypeFor(memberAst, struct);
       const tag = tagLiteralOf(struct);
       if (tag !== undefined) tagToName.set(tag, objectType.name);
@@ -415,7 +415,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
     const errorAsts = AST.isUnion(errorAst) ? errorAst.types : [errorAst];
     for (const memberAst of errorAsts) {
       const struct = structOf(memberAst);
-      if (!struct) throw new Error(`effect-graphql-provider: error member of '${name}' is not an object type`);
+      if (!struct) throw new Error(`effect-graphql: error member of '${name}' is not an object type`);
       const objectType = objectTypeFor(memberAst, struct);
       members.push(objectType);
       const tag = tagLiteralOf(struct);
@@ -460,7 +460,7 @@ export function deriveSchema<R>(input: DeriveInput<R>): GQL.GraphQLSchema {
   if (missing.length > 0) {
     const known = [...materialized].sort().join(", ");
     throw new Error(
-      `effect-graphql-provider: augment(s) target type(s) not present in the schema: ${missing.join(", ")}. Known types: ${known}`,
+      `effect-graphql: augment(s) target type(s) not present in the schema: ${missing.join(", ")}. Known types: ${known}`,
     );
   }
   return schema;

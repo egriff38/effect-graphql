@@ -1,0 +1,46 @@
+# Dependabot config: weekly bumps for npm, monthly for GH actions.
+#
+# Grouping strategy:
+#   - "effect-ecosystem" bundles effect + @effect/* together; they always ship
+#     in lockstep and bumping them one at a time would fill the PR queue.
+#   - "dev-tools" groups TypeScript, tsdown, vitest, and their type packages
+#     so linters/build tooling churn doesn't dominate the review load.
+#   - Everything else gets a solo PR — usually just graphql when 16.x picks
+#     up a patch.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      effect-ecosystem:
+        patterns:
+          - "effect"
+          - "@effect/*"
+      dev-tools:
+        patterns:
+          - "typescript"
+          - "tsdown"
+          - "vitest"
+          - "@vitest/*"
+          - "@types/*"
+    # Pre-release matching: Dependabot needs `versioning-strategy: increase` to
+    # bump beta versions in place, and `allow` to permit prereleases through.
+    versioning-strategy: increase
+    allow:
+      - dependency-name: "effect"
+      - dependency-name: "@effect/*"
+      - dependency-name: "graphql"
+      - dependency-name: "typescript"
+      - dependency-name: "tsdown"
+      - dependency-name: "vitest"
+      - dependency-name: "@vitest/*"
+      - dependency-name: "@types/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

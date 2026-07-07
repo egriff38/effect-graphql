@@ -106,7 +106,7 @@ export const augment = <
 ): Augment<S, RPC, R> => {
   const identifier = AST.resolveIdentifier(schema.ast);
   if (!identifier) {
-    throw new Error("effect-graphql-provider: augment target schema has no identifier (use Schema.Class or annotate it)");
+    throw new Error("effect-graphql: augment target schema has no identifier (use Schema.Class or annotate it)");
   }
   const rpcWithProps = rpc as unknown as Rpc.AnyWithProps;
   const internalField: InternalField<R> = {
