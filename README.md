@@ -21,7 +21,7 @@ bun add effect-graphql effect graphql
 ```ts
 import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
-import { Provider } from "effect-graphql";
+import { Provider, Executor } from "effect-graphql";
 
 class User extends Schema.Class<User>("User")({
   id: Schema.String.annotate({ graphql: { id: true } }),
@@ -39,10 +39,10 @@ const provider = Provider.make({
   },
 });
 
-// `toExecutor` wraps `graphql-js` with the two-tier runtime: `app` services
+// `Executor.make` wraps `graphql-js` with the two-tier runtime: `app` services
 // live for the process, `request` services (auth, loaders, per-request state)
 // are rebuilt from `request` fields on every call.
-const executor = Provider.toExecutor(provider);
+const executor = Executor.make(provider);
 
 const result = await executor.execute({
   query: `{ me { id name } }`,
@@ -51,10 +51,22 @@ const result = await executor.execute({
 console.log(result); // { data: { me: { id: "u1", name: "Ada" } } }
 ```
 
-`Provider.toSchema(provider)` is also available — it returns the raw
-`GraphQLSchema` for tooling (SDL printing, Yoga/Apollo integration) — but you
-**can't `graphql()` it directly**; the resolvers depend on the runtime that
-`toExecutor` supplies via `contextValue`.
+`Provider.toSchema(provider)` returns the raw `GraphQLSchema` for tooling (SDL
+printing, Yoga/Apollo integration) — but you **can't `graphql()` it directly**;
+the resolvers depend on the runtime that `Executor.make` supplies via
+`contextValue`. For the paved-path HTTP server, use `Provider.serve(provider)`
+(an effect-platform `HttpApp`).
+
+## Namespaces
+
+| Namespace | Purpose |
+|---|---|
+| `Provider` | Declare your API and reify transports: `make`, `field`, `augment`, `toSchema`, `serve`, `toRpcGroup`, `rpcHandlersLayer`, `rpcServerLayer` |
+| `Executor` | Materialize a Provider into a runnable executor: `make` |
+| `Loader` | Request-scoped tick-batched loader (DataLoader semantics): `make` |
+| `ProviderRequest` | Context service every request Layer can read; adapters populate `ProviderRequest.Fields` |
+
+`import { graphiql } from "effect-graphql/graphiql"` — subpath for the tree-shakable GraphiQL page.
 
 ## What it does
 
@@ -62,7 +74,7 @@ console.log(result); // { data: { me: { id: "u1", name: "Ada" } } }
 - Runs resolvers as `Effect<A, E, R>` inside a two-tier runtime (app-scoped services + a
   per-request context Layer built from headers/method/URL/body).
 - Types errors-as-data via result unions (ADR-0002).
-- Batches loads inside a request via `createLoader` (ADR-0003).
+- Batches loads inside a request via `Loader.make` (ADR-0003).
 - Ships a `Provider.serve` HttpApp and a tree-shakable `graphiql` subpath.
 
 ## Ideas & roadmap

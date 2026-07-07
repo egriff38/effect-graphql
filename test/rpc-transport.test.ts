@@ -1,8 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc, RpcTest } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
-import { ProviderRequest } from "../src/ProviderRequest.ts";
+import { Provider, ProviderRequest } from "../src/index.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures

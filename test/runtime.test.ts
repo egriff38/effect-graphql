@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider, ProviderRequest } from "../src/index.ts";
+import { Executor, Provider, ProviderRequest } from "../src/index.ts";
 
 // A type (pure shape).
 class User extends Schema.Class<User>("User")({
@@ -51,7 +51,7 @@ describe("two-tier runtime", () => {
       },
     });
 
-    const executor = Provider.toExecutor(provider);
+    const executor = Executor.make(provider);
     try {
       const result = await executor.execute({
         query: `{ me { id name } }`,

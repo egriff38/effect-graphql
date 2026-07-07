@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 class Pong extends Schema.Class<Pong>("Pong")({ ok: Schema.Boolean }) {}
 
@@ -25,7 +25,7 @@ describe("observability", () => {
       },
     });
 
-    const result = await Provider.toExecutor(provider).execute({
+    const result = await Executor.make(provider).execute({
       query: `{ ping { ok } }`,
       request: { method: "POST", url: "/graphql", headers: {}, body: null },
     });

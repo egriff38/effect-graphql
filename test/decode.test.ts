@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 class Greeting extends Schema.Class<Greeting>("Greeting")({ text: Schema.String }) {}
 
@@ -19,7 +19,7 @@ const provider = Provider.make({
 });
 
 const run = (query: string) =>
-  Provider.toExecutor(provider).execute({
+  Executor.make(provider).execute({
     query,
     request: { method: "POST", url: "/graphql", headers: {}, body: null },
   });

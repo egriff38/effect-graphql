@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 class Node extends Schema.Class<Node>("Node")({
   id: Schema.String,
@@ -19,25 +19,25 @@ const provider = Provider.make({
   },
 });
 
-const run = (executor: ReturnType<typeof Provider.toExecutor>, query: string) =>
+const run = (executor: ReturnType<typeof Executor.make>, query: string) =>
   executor.execute({ query, request: { method: "POST", url: "/", headers: {}, body: null } });
 
 describe("hardening", () => {
   it("allows introspection by default", async () => {
-    const result = await run(Provider.toExecutor(provider), `{ __schema { queryType { name } } }`);
+    const result = await run(Executor.make(provider), `{ __schema { queryType { name } } }`);
     expect(result.errors).toBeUndefined();
     expect(result.data).toEqual({ __schema: { queryType: { name: "Query" } } });
   });
 
   it("rejects introspection when disabled", async () => {
-    const executor = Provider.toExecutor(provider, { introspection: false });
+    const executor = Executor.make(provider, { introspection: false });
     const result = await run(executor, `{ __schema { queryType { name } } }`);
     expect(result.errors).toBeDefined();
     expect((result.errors ?? []).length).toBeGreaterThan(0);
   });
 
   it("rejects queries deeper than maxDepth, allows shallow ones", async () => {
-    const executor = Provider.toExecutor(provider, { maxDepth: 2 });
+    const executor = Executor.make(provider, { maxDepth: 2 });
     const ok = await run(executor, `{ node { id } }`);
     expect(ok.errors).toBeUndefined();
 

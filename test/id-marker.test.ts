@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { printSchema } from "graphql";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 class User extends Schema.Class<User>("User")({
   id: Schema.String.annotate({ graphql: { id: true } }),
@@ -39,7 +39,7 @@ describe("ID marker (#20)", () => {
   });
 
   it("round-trips an ID-typed value end-to-end", async () => {
-    const result = await Provider.toExecutor(provider).execute({
+    const result = await Executor.make(provider).execute({
       query: `{ user(id: "u1") { id name } }`,
       request: { method: "POST", url: "/", headers: {}, body: null },
     });

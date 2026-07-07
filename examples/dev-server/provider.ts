@@ -12,12 +12,7 @@
 
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
-import {
-  createLoader,
-  type Loader,
-  Provider,
-  ProviderRequest,
-} from "../../src/index.ts";
+import { Loader, Provider, ProviderRequest } from "../../src/index.ts";
 import {
   Comment,
   CreatePostInput,
@@ -68,22 +63,22 @@ const RequestLayer = Layer.mergeAll(
     }),
   ),
   Layer.effect(UserByIdLoader)(
-    createLoader((ids: ReadonlyArray<string>) =>
+    Loader.make((ids: ReadonlyArray<string>) =>
       Effect.sync(() => ids.map((id) => USERS.find((u) => u.id === id) ?? null))
     ),
   ),
   Layer.effect(CommentsByPostLoader)(
-    createLoader((postIds: ReadonlyArray<string>) =>
+    Loader.make((postIds: ReadonlyArray<string>) =>
       Effect.sync(() => postIds.map((id) => COMMENTS.filter((c) => c.postId === id)))
     ),
   ),
   Layer.effect(CommentsByUserLoader)(
-    createLoader((userIds: ReadonlyArray<string>) =>
+    Loader.make((userIds: ReadonlyArray<string>) =>
       Effect.sync(() => userIds.map((id) => COMMENTS.filter((c) => c.authorId === id)))
     ),
   ),
   Layer.effect(PostsByAuthorLoader)(
-    createLoader((userIds: ReadonlyArray<string>) =>
+    Loader.make((userIds: ReadonlyArray<string>) =>
       Effect.sync(() => userIds.map((id) => POSTS.filter((p) => p.authorId === id)))
     ),
   ),

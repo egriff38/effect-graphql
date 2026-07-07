@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Provider, ProviderRequest } from "../src/index.ts";
+import { Executor, Provider, ProviderRequest } from "../src/index.ts";
 
 class Secret extends Schema.Class<Secret>("Secret")({ value: Schema.String }) {}
 
@@ -38,7 +38,7 @@ const provider = Provider.make({
 });
 
 const run = (role: string) =>
-  Provider.toExecutor(provider).execute({
+  Executor.make(provider).execute({
     query: `{ secret { __typename ... on Secret { value } ... on Forbidden { reason } } }`,
     request: { method: "POST", url: "/graphql", headers: { "x-role": role }, body: null },
   });

@@ -20,10 +20,10 @@ interface Pending<K, V> {
  * value per key (same order). Its required services `R` are captured at creation, so `load`
  * itself needs no services.
  */
-export const createLoader = <K, V, E, R>(
+export const make = <K, V, E, R>(
   batch: (keys: ReadonlyArray<K>) => Effect.Effect<ReadonlyArray<V>, E, R>,
 ): Effect.Effect<Loader<K, V>, never, R> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const context = yield* Effect.context<R>();
     const cache = new Map<K, Promise<V>>();
     let queue: Array<Pending<K, V>> = [];

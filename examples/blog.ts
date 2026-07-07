@@ -10,7 +10,7 @@
  *   5. Authorization guards
  *   6. Augmentations (relationship fields) with a tick-batched Loader
  *   7. Both transports running against the SAME Provider:
- *      - GraphQL via `Provider.toExecutor`  (effect-platform adapter)
+ *      - GraphQL via `Executor.make`  (effect-platform adapter)
  *      - RPC    via `Provider.rpcHandlersLayer` + `RpcTest.makeClient`
  *
  * Run:  bunx tsx examples/blog.ts
@@ -113,7 +113,7 @@ export const provider = GraphQL.Provider.make({
     // PostsByAuthorLoader: a tick-batched loader that coalesces N author lookups
     // across sibling resolvers into a single batch call.
     Layer.effect(PostsByAuthorLoader)(
-      GraphQL.createLoader((authorIds: ReadonlyArray<string>) =>
+      GraphQL.Loader.make((authorIds: ReadonlyArray<string>) =>
         Effect.succeed(
           authorIds.map((id) => POSTS.filter((p) => p.authorId === id)),
         ),
@@ -244,7 +244,7 @@ const demo = Effect.gen(function* () {
   hr();
   console.log("GRAPHQL TRANSPORT\n");
 
-  const executor = GraphQL.Provider.toExecutor(provider);
+  const executor = GraphQL.Executor.make(provider);
   const gql = (query: string, headers: Record<string, string> = {}) =>
     executor.execute({
       query,

@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`public API surface (#9) > matches the recorded snapshot 1`] = `
+{
+  "namespaceMembers": {
+    "Executor": [
+      "make",
+    ],
+    "Loader": [
+      "make",
+    ],
+    "Provider": [
+      "augment",
+      "field",
+      "make",
+      "rpcHandlersLayer",
+      "rpcServerLayer",
+      "serve",
+      "toRpcGroup",
+      "toSchema",
+    ],
+  },
+  "topLevelExports": [
+    "Executor",
+    "Loader",
+    "Provider",
+    "ProviderRequest",
+  ],
+}
+`;

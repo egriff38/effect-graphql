@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { createLoader, type Loader, Provider } from "../src/index.ts";
+import { Executor, Loader, Provider } from "../src/index.ts";
 
 class Item extends Schema.Class<Item>("Item")({ id: Schema.String }) {}
 
@@ -14,7 +14,7 @@ describe("request-scoped tick-batched loader", () => {
     const provider = Provider.make({
       app: Layer.empty,
       request: Layer.effect(LabelLoader)(
-        createLoader((keys: ReadonlyArray<string>) =>
+        Loader.make((keys: ReadonlyArray<string>) =>
           Effect.sync(() => {
             batchCalls.push(keys);
             return keys.map((k) => `label:${k}`);
@@ -36,7 +36,7 @@ describe("request-scoped tick-batched loader", () => {
       ],
     });
 
-    const result = await Provider.toExecutor(provider).execute({
+    const result = await Executor.make(provider).execute({
       query: `{ items { label } }`,
       request: { method: "POST", url: "/graphql", headers: {}, body: null },
     });

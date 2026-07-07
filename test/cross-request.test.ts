@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { createLoader, type Loader, Provider } from "../src/index.ts";
+import { Executor, Loader, Provider } from "../src/index.ts";
 
 class L extends Context.Service<L, Loader<string, string>>()("test/xreq/L") {}
 
@@ -15,7 +15,7 @@ describe("cross-request isolation", () => {
       request: Layer.effect(L)(
         Effect.gen(function*() {
           yield* Effect.addFinalizer(() => Effect.sync(() => { finalizes++; }));
-          return yield* createLoader((keys: ReadonlyArray<string>) =>
+          return yield* Loader.make((keys: ReadonlyArray<string>) =>
             Effect.sync(() => {
               batches.push(keys);
               return keys.map((k) => `v:${k}`);
@@ -35,7 +35,7 @@ describe("cross-request isolation", () => {
       },
     });
 
-    const executor = Provider.toExecutor(provider);
+    const executor = Executor.make(provider);
     const q = `{ label(id: "1") }`;
     const r1 = await executor.execute({ query: q, request: { method: "POST", url: "/", headers: {}, body: null } });
     const r2 = await executor.execute({ query: q, request: { method: "POST", url: "/", headers: {}, body: null } });

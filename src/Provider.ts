@@ -1,26 +1,31 @@
-// Public surface. A Provider bundles the type/operation definitions with the app + request
-// Layers that satisfy resolver requirements. `AppR | ReqR` is the set of services resolvers may
-// require; a resolver requiring anything outside it is a compile error.
+// Provider — describe a GraphQL API from Effect Schemas and Effect resolvers.
 //
-// Per-tag typing: `Provider.field` and `Provider.augment` carry their `Rpc.make(...)` type out
-// (in `Field<RPC, R>` / `Augment<S, RPC, R>`), and `Provider.make` accumulates the union of
-// every root op's RPC type. That union flows through to `Provider.toRpcGroup`, producing a
-// fully-typed `RpcGroup<Rpcs>` and a per-tag `RpcClient<Rpcs>` — no casts at the test boundary.
+// A Provider is *description*: schemas, resolvers, and the two Layers (app + request) that
+// satisfy the resolvers' `R`. It's cheap to build; it doesn't materialize a runtime.
+//
+// Downstream helpers:
+//   - `Executor.make(provider)`      — manual execution (tests, custom transports)
+//   - `Provider.serve(provider)`     — effect-platform HttpApp (paved-path GraphQL server)
+//   - `Provider.toRpcGroup(provider)`, `Provider.rpcHandlersLayer(provider)`,
+//     `Provider.rpcServerLayer(provider, opts)` — reify the Provider's root operations as
+//     Effect RPC artifacts, without introducing a name that shadows `effect/unstable/rpc`.
+//
+// Per-tag typing: `Provider.field` and `Provider.augment` carry their `Rpc.make(...)` type
+// out via `Field<RPC, R>` / `Augment<S, RPC, R>`. `Provider.make` accumulates the union of
+// every root op's RPC type into the Provider's `Rpcs` phantom, which the RPC helpers below
+// surface without casts.
 
-import { Effect, Layer, SchemaAST as AST } from "effect";
+import { Effect, Layer, Record as Rec, SchemaAST as AST } from "effect";
 import type { Schema } from "effect";
 import type { NoInfer } from "effect/Types";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-import type { GraphQLSchema } from "graphql";
-import type { ProviderRequest } from "./ProviderRequest.ts";
-import { deriveSchema, type InternalAugment, type InternalField } from "./internal/derive.ts";
-import { type Executor, makeExecutor } from "./internal/runtime.ts";
-import type { HardeningOptions } from "./internal/hardening.ts";
-
-import type { Rpc, RpcGroup as RpcGroupNS } from "effect/unstable/rpc";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import type { HttpRouter } from "effect/unstable/http";
-import * as InternalRpc from "./internal/rpc.ts";
+import type { GraphQLSchema } from "graphql";
+import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { ProviderRequest } from "./ProviderRequest.ts";
+import { deriveSchema, type InternalAugment, type InternalField } from "./internal/derive.ts";
+import type { HardeningOptions } from "./internal/hardening.ts";
+import { make as makeExecutor } from "./Executor.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Field / Augment — typed wrappers carrying the RPC type as a phantom for inference
@@ -32,7 +37,7 @@ import * as InternalRpc from "./internal/rpc.ts";
  * `Rpc.Payload<R>`/`Rpc.Success<R>`/`Rpc.Error<R>`.
  *
  * The phantom `RPC` parameter is what `Provider.make` reads via mapped types
- * to build the union of every root op, which `toRpcGroup` then surfaces as
+ * to build the union of every root op, which `Rpc.toGroup` then surfaces as
  * `RpcGroup<Rpcs>`.
  */
 export interface Field<out RPC extends Rpc.Any, out R> extends InternalField<R> {
@@ -137,7 +142,7 @@ type FieldRpcs<F> = F extends Record<string, Field<infer RPC, any>> ? RPC : neve
 /** Extracts the union of RPC types from an array of `Augment` values. */
 type AugmentRpcs<A> = A extends ReadonlyArray<Augment<any, infer RPC, any>> ? RPC : never;
 
-export interface ProviderConfig<AppR, ReqR, E> {
+export interface Config<AppR, ReqR, E> {
   // `AppR` is inferred only from `app`, `ReqR` only from `request`'s output; the other
   // positions are `NoInfer` so they validate (resolver requirements ⊆ AppR | ReqR) without
   // polluting inference (otherwise `request`'s RIn could degenerately fix `AppR`).
@@ -156,10 +161,10 @@ declare const RpcsPhantom: unique symbol;
  *   AppR  — services satisfied by the app Layer
  *   ReqR  — services produced by the per-request Layer
  *   E     — error type emitted by either layer
- *   Rpcs  — union of every root op's `Rpc.make(...)` type (phantom; flows to toRpcGroup)
+ *   Rpcs  — union of every root op's `Rpc.make(...)` type (phantom; flows to Rpc.toGroup)
  */
 export interface Provider<AppR, ReqR, E, out Rpcs extends Rpc.Any = Rpc.Any> {
-  readonly config: ProviderConfig<AppR, ReqR, E>;
+  readonly config: Config<AppR, ReqR, E>;
   /** Phantom marker — never read at runtime, used to surface `Rpcs` to consumers. */
   readonly [RpcsPhantom]: (_: never) => Rpcs;
 }
@@ -181,7 +186,7 @@ export const make = <
   ({ config } as unknown as Provider<AppR, ReqR, E, FieldRpcs<Q> | FieldRpcs<M> | AugmentRpcs<A>>);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GraphQL deriver / executor / serve — unchanged behaviour, generics widened
+// toSchema — pure Provider -> GraphQLSchema transform (no runtime)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const toSchema = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
@@ -193,10 +198,14 @@ export const toSchema = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
     augmentations: provider.config.augmentations ?? [],
   });
 
-export const toExecutor = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
-  provider: Provider<AppR, ReqR, E, Rpcs>,
-  hardening?: HardeningOptions,
-): Executor => makeExecutor(toSchema(provider), provider.config.app, provider.config.request, hardening);
+// ─────────────────────────────────────────────────────────────────────────────
+// serve — effect-platform HttpApp
+//
+// The paved-path one-liner. Reads a GraphQL request from the body, bridges it to a
+// ProviderRequest, executes through the two-tier runtime, and returns JSON. Internally
+// builds one Executor (the app runtime materializes once when serve is called and is
+// reused per request).
+// ─────────────────────────────────────────────────────────────────────────────
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -205,16 +214,11 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
-/**
- * An effect-platform HttpApp serving the Provider: reads a GraphQL request from the body,
- * bridges it to a ProviderRequest, executes through the two-tier runtime, and returns JSON.
- * The app runtime is built once when `serve` is called and reused per request.
- */
 export const serve = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
   hardening?: HardeningOptions,
 ) => {
-  const executor = toExecutor(provider, hardening);
+  const executor = makeExecutor(provider, hardening);
   return Effect.gen(function*() {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* request.json;
@@ -232,26 +236,86 @@ export const serve = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RPC transport — typed all the way through to the client
+// RPC transport — reify a Provider's root operations as Effect RPC artifacts.
+//
+// Kept on `Provider` (rather than a separate `Rpc` namespace) to avoid shadowing
+// `effect/unstable/rpc` inside call sites that also import from Effect's RPC module.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Merge query + mutation fields into one tag-keyed record (augments are excluded). */
+const rootFields = <R>(config: {
+  readonly query: Record<string, InternalField<R>>;
+  readonly mutation?: Record<string, InternalField<R>> | undefined;
+}): Record<string, InternalField<R>> => ({ ...config.query, ...config.mutation });
+
+/**
+ * Reify the Provider's root operations as an Effect `RpcGroup`. Per-tag typing survives:
+ * the returned group is `RpcGroup<Rpcs>` where `Rpcs` was accumulated by `Provider.make`.
+ */
 export const toRpcGroup = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
-): RpcGroupNS.RpcGroup<Rpcs> =>
-  InternalRpc.toRpcGroup(provider.config) as unknown as RpcGroupNS.RpcGroup<Rpcs>;
+): RpcGroup.RpcGroup<Rpcs> =>
+  RpcGroup.make(...Object.values(rootFields(provider.config)).map((f) => f.rpc)) as
+    unknown as RpcGroup.RpcGroup<Rpcs>;
 
+/**
+ * Build a Layer providing the handler for every rpc in the Provider's group. Each handler
+ * builds a per-request Context from the rpc's headers (mirroring what the GraphQL adapter
+ * does from HTTP headers) and runs the field's resolver through the two-tier runtime.
+ */
 export const rpcHandlersLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
-): Layer.Layer<Rpc.ToHandler<Rpcs>, E, never> =>
-  InternalRpc.rpcHandlersLayer(
-    toRpcGroup(provider) as unknown as RpcGroupNS.RpcGroup<Rpc.Any>,
-    provider.config,
-  ) as unknown as Layer.Layer<Rpc.ToHandler<Rpcs>, E, never>;
+): Layer.Layer<Rpc.ToHandler<Rpcs>, E, never> => {
+  const group = toRpcGroup(provider);
+  const handlers = Rec.map(
+    rootFields(provider.config),
+    (field) =>
+      (
+        payload: unknown,
+        options: { readonly headers: Readonly<Record<string, string>> },
+      ) =>
+        Effect.flatMap(
+          Layer.build(provider.config.request).pipe(
+            Effect.provideService(ProviderRequest, {
+              method: "RPC",
+              url: field.rpc._tag,
+              headers: { ...options.headers },
+              body: payload,
+            }),
+          ),
+          (requestContext) =>
+            Effect.provideContext(field.run(undefined, payload), requestContext),
+        ),
+  );
 
+  // `group` and the returned layer are same-shape casts through the erased `Rpc.Any` — the
+  // mapped types can't be expressed at this level, but per-tag identity is preserved end to
+  // end because handlers are keyed by the same rpc tags as the group.
+  const erasedGroup: RpcGroup.RpcGroup<Rpc.Any> = group as unknown as RpcGroup.RpcGroup<Rpc.Any>;
+  const layer = erasedGroup.toLayer(handlers as never).pipe(Layer.provide(provider.config.app));
+  return layer as unknown as Layer.Layer<Rpc.ToHandler<Rpcs>, E, never>;
+};
+
+/**
+ * Layer that mounts an rpc server on `options.path`. Consumes `HttpRouter.HttpRouter` from
+ * the runtime; requires nothing else because the handlers layer and JSON serialization are
+ * provided internally.
+ */
 export const rpcServerLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
-  options: { readonly path: HttpRouter.PathInput; readonly protocol?: "http" | "websocket" | undefined },
-): Layer.Layer<never, E, HttpRouter.HttpRouter | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>> =>
-  RpcServer.layerHttp({ group: toRpcGroup(provider), path: options.path, protocol: options.protocol ?? "http" }).pipe(
+  options: {
+    readonly path: HttpRouter.PathInput;
+    readonly protocol?: "http" | "websocket" | undefined;
+  },
+): Layer.Layer<
+  never,
+  E,
+  HttpRouter.HttpRouter | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>
+> =>
+  RpcServer.layerHttp({
+    group: toRpcGroup(provider),
+    path: options.path,
+    protocol: options.protocol ?? "http",
+  }).pipe(
     Layer.provide([rpcHandlersLayer(provider), RpcSerialization.layerJson]),
   );

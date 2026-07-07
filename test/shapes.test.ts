@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { printSchema } from "graphql";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 // Optionals + lists + self-recursion in one type.
 class Category extends Schema.Class<Category>("Category")({
@@ -43,7 +43,7 @@ describe("schema shapes: lists, recursion, optionals", () => {
   });
 
   it("resolves a recursive selection", async () => {
-    const result = await Provider.toExecutor(provider).execute({
+    const result = await Executor.make(provider).execute({
       query: `{ root { id tags children { id children { id } } } }`,
       request: { method: "POST", url: "/graphql", headers: {}, body: null },
     });

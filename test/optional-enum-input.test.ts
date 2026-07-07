@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { printSchema } from "graphql";
 import { describe, expect, it } from "vitest";
-import { Provider } from "../src/index.ts";
+import { Executor, Provider } from "../src/index.ts";
 
 const Status = Schema.Literals(["Active", "Archived"]).annotate({ identifier: "Status" });
 
@@ -32,7 +32,7 @@ const provider = Provider.make({
 });
 
 const run = (query: string) =>
-  Provider.toExecutor(provider).execute({
+  Executor.make(provider).execute({
     query,
     request: { method: "POST", url: "/", headers: {}, body: null },
   });
