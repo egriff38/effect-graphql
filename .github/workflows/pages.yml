@@ -135,18 +135,19 @@ jobs:
             sed -i -E 's#\{@link[[:space:]]+effect://([^}[:space:]]+)\}#[\1](https://effect-ts.github.io/effect/effect/\1.ts.html)#g' "$f"
           done
 
+      - name: Stage CNAME for the custom domain
+        # Workflow-based Pages ignores a CNAME file in the source repo but
+        # honors one Jekyll passes through into the deployed artifact. Writing
+        # it into `docs/` (the Jekyll source) before the build sidesteps the
+        # post-build permission issue where the Jekyll container writes
+        # `_site/` as root.
+        run: echo "effect-graphql.js.org" > docs/CNAME
+
       - name: Build Jekyll site
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
-
-      - name: Add CNAME for custom domain
-        # Workflow-based Pages doesn't process a CNAME file in the source
-        # repo, but it *does* honor one placed in the deployed artifact.
-        # js.org's DNS points effect-graphql.js.org at egriff38.github.io;
-        # this line tells GitHub Pages which vhost to serve to that domain.
-        run: echo "effect-graphql.js.org" > _site/CNAME
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
