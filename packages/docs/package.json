@@ -7,6 +7,12 @@
   "scripts": {
     "typecheck": "true",
     "test": "true",
-    "build": "true"
+    "build": "vitepress build",
+    "dev": "vitepress dev",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "@shikijs/vitepress-twoslash": "^3.23.0",
+    "vitepress": "^1.6.4"
   }
 }

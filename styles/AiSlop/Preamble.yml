@@ -1,0 +1,22 @@
+# AiSlop.Preamble — bans ceremonial preamble openers.
+#
+# From taxonomy §1.1 ("Ceremonial preamble") — openings like "In today's
+# rapidly evolving world of..." that fill space before the reader learns
+# anything. Guides start with the goal in the first sentence.
+#
+# See: <https://vale.sh/docs/checks/existence>
+
+extends: existence
+message: >
+  Cut the ceremonial preamble ('%s'). Guides open with the goal, not the
+  landscape.
+level: error
+ignorecase: true
+tokens:
+  - "in today's [a-z-]+ world"
+  - "ever-evolving"
+  - "rapidly evolving"
+  - "in the modern (software|world|era)"
+  - "in the world of"
+  - "in an era where"
+  - "at the heart of"

@@ -32,6 +32,14 @@ jobs:
       - name: API reference (docgen)
         run: bun run docgen
 
+      - name: Lint prose (Vale)
+        uses: errata-ai/vale-action@reviewdog
+        with:
+          # Only errors block CI; warnings show as review comments.
+          fail_on_error: true
+          reporter: github-pr-review
+          files: 'packages/docs packages/core/README.md README.md'
+
       - name: Package (dry-run)
         working-directory: packages/core
         run: npm pack --dry-run

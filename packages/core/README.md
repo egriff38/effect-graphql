@@ -7,9 +7,8 @@ the runtime; graphql-js owns the wire.
 
 **0.x — the surface is stable enough to try, but expect minor breakage until 1.0.**
 
-Full documentation is tracked in [#15](https://github.com/egriff38/effect-graphql/issues/15).
-Remaining GraphQL spec features are catalogued and complexity-rated in
-[#23](https://github.com/egriff38/effect-graphql/issues/23).
+Documentation issue: [#15](https://github.com/egriff38/effect-graphql/issues/15).
+Remaining GraphQL spec features and complexity ratings: [#23](https://github.com/egriff38/effect-graphql/issues/23).
 
 ## Install
 

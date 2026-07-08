@@ -12,6 +12,8 @@
     "docgen": "bun --filter effect-graphql docgen",
     "dev": "bun --hot examples/dev-server/main.ts",
     "prototype": "bun prototype/main.ts",
+    "lint:case": "bun scripts/lint-case.ts",
+    "lint:prose": "vale packages/docs/ packages/core/README.md README.md",
     "release": "./release.sh"
   },
   "devDependencies": {

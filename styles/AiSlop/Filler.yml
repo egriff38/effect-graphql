@@ -1,0 +1,26 @@
+# AiSlop.Filler — bans hedge-then-conclude filler phrases.
+#
+# Taxonomy §1.2 ("false-hedge qualifiers"), §1.6 ("rhetorical questions"),
+# §1.7 ("summary/CTA sandwich"). These phrases pad without saying anything.
+
+extends: existence
+message: "Cut the filler ('%s'). Say the fact directly."
+level: error
+ignorecase: true
+tokens:
+  - "it's (worth|important) (to note|noting)"
+  - "note that"
+  - "but what does this really mean"
+  - "ever wondered"
+  - "why does this matter"
+  - "let's find out"
+  - "let's dive in"
+  - "let's take a look"
+  - "in conclusion"
+  - "to sum up"
+  - "in summary"
+  - "happy coding"
+  - "hope this helps"
+  - "feel free to"
+  - "at this time"
+  - "at this juncture"

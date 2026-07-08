@@ -1,0 +1,38 @@
+# AiSlop.Marketing — bans marketing lexemes empirically observed in LLM output.
+#
+# The word list is drawn from the anti-pattern taxonomy §1.3, §1.11 in
+# docs-research-report.md (Grammarly/Sapling AI-content corpora + Simon
+# Willison's slop tag). Each substitution reads as "prefer plain word →
+# banned marketing word", so Vale's error message tells the author to swap.
+#
+# See: <https://vale.sh/docs/checks/substitution>
+
+extends: substitution
+message: "Avoid the marketing lexeme '%s'. Prefer plain, specific language."
+level: error
+ignorecase: true
+
+# Format: 'banned regex' -> 'suggested replacement'.
+# Vale treats keys as regex; keep them plain unless we need alternation.
+swap:
+  '\b(delve|delves|delving|delved)\b': "explore, look at, or a specific verb"
+  '\b(leverage|leverages|leveraging|leveraged)\b': use
+  '\b(harness|harnesses|harnessing|harnessed)\b': use
+  '\b(unlock|unlocks|unlocking|unlocked)\b': enable
+  '\b(unleash|unleashes|unleashing|unleashed)\b': release
+  '\bseamlessly\b': cleanly, without friction, or drop
+  '\brobust\b': (drop; specific claim instead)
+  '\bcutting-edge\b': (drop; specific date or feature)
+  '\belevate(s|d|ing)?\b': improve
+  '\bfoster(s|ed|ing)?\b': encourage or drop
+  '\bunderscore(s|d|ing)?\b': show or drop
+  '\bparamount\b': critical
+  '\bnuanced\b': specific
+  '\btapestry\b': (drop)
+  '\brealm\b': area
+  '\bpowerful\b': (drop; specific capability instead)
+  '\bblazing[- ]fast\b': (drop or cite a benchmark)
+  '\blightning[- ]fast\b': (drop or cite a benchmark)
+  '\bproduction[- ]ready\b': (drop or list what "ready" means)
+  '\benterprise[- ]grade\b': (drop)
+  '\bscalable\b': (drop; specific scale target instead)

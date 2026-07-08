@@ -1,0 +1,22 @@
+# AiSlop.Brands — brand-casing rules for prose contexts.
+#
+# Fires only on the standalone token, not when embedded in package names or
+# URLs. The negative lookbehind on `effect-` catches the most common case
+# (`effect-graphql` is our own npm package name).
+#
+# Vale's Markdown format skips fenced code and inline code by default, so
+# `import { Rpc } from "effect/unstable/rpc"` inside a fenced block won't fire.
+# URLs are also usually inside `[link](https://...)` or fenced.
+
+extends: substitution
+message: "Prose brand casing: use '%s'."
+level: error
+ignorecase: false
+swap:
+  # graphql → GraphQL, but never in `effect-graphql` (our npm package name)
+  '(?<!effect-)\b(graphql|Graphql)\b(?!-[a-z])': GraphQL
+  '\b(github|Github|GITHUB)\b': GitHub
+  '\b(typescript|Typescript|TYPESCRIPT)\b': TypeScript
+  '\b(javascript|Javascript|JAVASCRIPT)\b': JavaScript
+  '\b(nodejs|NodeJS|NODEJS)\b': Node.js
+  '\bpostgresql\b': PostgreSQL

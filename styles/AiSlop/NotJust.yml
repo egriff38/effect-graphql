@@ -1,0 +1,12 @@
+# AiSlop.NotJust — bans the "not just X, it's Y and Z" three-part puff.
+#
+# Taxonomy §1.5. This construction inflates a normal claim into a philosophy,
+# and it's a reliable LLM tell.
+
+extends: existence
+message: >
+  Cut the 'not just X, it's Y' construction ('%s'). Make one specific claim.
+level: error
+ignorecase: true
+tokens:
+  - "not (just|only) [a-z ,]{2,40}[,—-] it's"
