@@ -30,11 +30,123 @@ jobs:
       - name: Generate API reference
         run: bun run docgen
 
+      # ── Post-docgen shaping ────────────────────────────────────────────────
+      # The docs pipeline runs entirely from generated content — every step here
+      # rewrites files docgen produced (or writes new ones alongside them). The
+      # source of truth for JSDoc content stays in `src/`; this step shapes the
+      # rendered site.
+
+      - name: Scope Jekyll to modules only (exclude adr/)
+        run: |
+          cat >> docs/_config.yml <<'EOF'
+
+          # Keep architectural decision records out of the published site — they
+          # live in the repo for reviewers, not consumers browsing the API.
+          exclude:
+            - adr
+          EOF
+
+      - name: Write the site landing page
+        run: |
+          cat > docs/index.md <<'EOF'
+          ---
+          title: Home
+          nav_order: 1
+          ---
+
+          # effect-graphql
+
+          Derive a GraphQL API from Effect `Schema` types and Effect-based
+          resolvers. Effect owns the runtime; graphql-js owns the wire.
+
+          ## Install
+
+          ```sh
+          bun add effect-graphql effect graphql
+          ```
+
+          `effect` and `graphql` are peer dependencies — bring your own.
+
+          ## Hello, world
+
+          ```ts
+          import { Effect, Layer, Schema } from "effect"
+          import { Rpc } from "effect/unstable/rpc"
+          import { Provider, Executor } from "effect-graphql"
+
+          class User extends Schema.Class<User>("User")({
+            id: Schema.String.annotate({ graphql: { id: true } }),
+            name: Schema.String,
+          }) {}
+
+          const provider = Provider.make({
+            app: Layer.empty,
+            request: Layer.empty,
+            query: {
+              me: Provider.field({
+                rpc: Rpc.make("me", { success: User }),
+                resolve: () => Effect.succeed(new User({ id: "u1", name: "Ada" })),
+              }),
+            },
+          })
+
+          const executor = Executor.make(provider)
+          const result = await executor.execute({
+            query: `{ me { id name } }`,
+            request: { method: "POST", url: "/graphql", headers: {}, body: null },
+          })
+          ```
+
+          ## Modules
+
+          - [Provider](modules/Provider.ts.html) — declare an API, reify transports
+          - [Executor](modules/Executor.ts.html) — materialize a Provider into a runtime
+          - [Loader](modules/Loader.ts.html) — request-scoped tick-batched loader
+          - [ProviderRequest](modules/ProviderRequest.ts.html) — per-request Context service
+          - [graphiql](modules/graphiql.ts.html) — tree-shakable GraphiQL page
+
+          ## Ecosystem
+
+          Built on the Effect TypeScript library. Concepts you'll see across
+          these docs (linked to the published Effect 3.x docs; the 4.x-beta
+          `unstable/*` modules referenced in signatures don't have published
+          docs yet):
+
+          - [effect](https://effect-ts.github.io/effect/effect/) — `Effect`, `Layer`, `Schema`, `Context`, `Scope`, `ManagedRuntime`
+          - [effect/platform](https://effect-ts.github.io/effect/platform/) — HTTP primitives (equivalent to `effect/unstable/http` in 4.x)
+          - [effect/rpc](https://effect-ts.github.io/effect/rpc/) — RPC primitives (equivalent to `effect/unstable/rpc` in 4.x)
+          - [graphql-js](https://graphql.org/graphql-js/) — the underlying GraphQL runtime and type system
+
+          ## Repository
+
+          Source, ADRs, and roadmap: [github.com/egriff38/effect-graphql](https://github.com/egriff38/effect-graphql).
+          EOF
+
+      - name: Expand `effect://` link shorthand
+        run: |
+          # JSDoc authors can write `{@link effect://Layer}` to point at
+          # https://effect-ts.github.io/effect/effect/Layer.ts.html without
+          # spelling out the URL each time. This step rewrites the shorthand
+          # in every generated module page. Applied post-docgen so JSDoc source
+          # stays readable in-editor.
+          find docs/modules -name '*.md' -type f | while read -r f; do
+            # {@link effect://<Path>}  →  [<Path>](https://.../effect/<Path>.ts.html)
+            # `<Path>` may include `/` for nested modules (e.g. unstable/http/HttpRouter).
+            sed -i -E 's#\{@link[[:space:]]+effect://([^}[:space:]]+)\}#[\1](https://effect-ts.github.io/effect/effect/\1.ts.html)#g' "$f"
+          done
+
       - name: Build Jekyll site
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
+
+      - name: Add CNAME for custom domain
+        # Workflow-based Pages doesn't process a CNAME file in the source
+        # repo, but it *does* honor one placed in the deployed artifact.
+        # js.org's DNS points effect-graphql.js.org at egriff38.github.io;
+        # this line tells GitHub Pages which vhost to serve to that domain.
+        run: echo "effect-graphql.js.org" > _site/CNAME
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
