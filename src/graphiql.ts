@@ -1,23 +1,37 @@
 /**
- * GraphiQL helper — a tree-shakable subpath export.
+ * Tree-shakable GraphiQL page helper. Returns an `HttpServerResponse` that
+ * serves the standard GraphiQL HTML page from a CDN, configured to POST
+ * GraphQL operations against a chosen endpoint. Mount it on any `HttpRouter`
+ * route.
  *
- * Returns an `HttpServerResponse` containing the standard GraphiQL HTML page
- * configured to POST queries against `endpoint`. Mount it on a route like
- * `HttpRouter.add("GET", "/graphiql", graphiql({ endpoint: "/graphql" }))`.
- *
- * The page is loaded from a CDN (the canonical GraphiQL distribution); no bundled
- * assets, no runtime dependencies beyond `effect/unstable/http`. The introspection
- * toggle is enforced at the GraphQL schema level by `Provider.toExecutor` — this
- * helper doesn't gate access; if introspection is disabled the page renders but
- * its docs explorer will be empty.
+ * The GraphQL introspection toggle is enforced at the schema level by
+ * `Executor.make` — this helper doesn't gate access; if introspection is
+ * disabled the page renders but its docs explorer will be empty.
  *
  * Imported as a subpath so a build that doesn't use it never resolves this file:
  *
  *   import { graphiql } from "effect-graphql/graphiql"
+ *
+ * @since 0.1.0
  */
 
 import { HttpServerResponse } from "effect/unstable/http";
 
+/**
+ * Options controlling the rendered GraphiQL page.
+ *
+ * @example
+ * import type { GraphiQLOptions } from "effect-graphql/graphiql"
+ *
+ * const opts: GraphiQLOptions = {
+ *   endpoint: "/graphql",
+ *   title: "My API",
+ *   defaultHeaders: { "x-user": "u1" },
+ * }
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface GraphiQLOptions {
   /** Path the page will POST GraphQL operations against. Default: `/graphql`. */
   readonly endpoint?: string | undefined;
@@ -66,15 +80,21 @@ const renderPage = (
 };
 
 /**
- * Build a GraphiQL response pre-configured to POST against `endpoint`.
+ * Build a GraphiQL response pre-configured to POST against `endpoint`. Mount
+ * on any `HttpRouter` route to serve the page from your server.
  *
  * @example
- * ```ts
  * import { HttpRouter } from "effect/unstable/http"
  * import { graphiql } from "effect-graphql/graphiql"
  *
- * HttpRouter.add("GET", "/graphiql", graphiql({ endpoint: "/graphql" }))
- * ```
+ * const router = HttpRouter.add(
+ *   "GET",
+ *   "/graphiql",
+ *   graphiql({ endpoint: "/graphql" }),
+ * )
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const graphiql = (
   options?: GraphiQLOptions,

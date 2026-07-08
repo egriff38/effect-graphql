@@ -5,7 +5,7 @@ import { Executor, Loader, Provider } from "../src/index.ts";
 
 class Item extends Schema.Class<Item>("Item")({ id: Schema.String }) {}
 
-class LabelLoader extends Context.Service<LabelLoader, Loader<string, string>>()("test/LabelLoader") {}
+class LabelLoader extends Context.Service<LabelLoader, Loader.Loader<string, string>>()("test/LabelLoader") {}
 
 describe("request-scoped tick-batched loader", () => {
   it("coalesces same-tick loads across sibling resolvers into one batch call", async () => {

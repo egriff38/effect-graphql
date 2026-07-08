@@ -76,7 +76,7 @@ class Auth extends Context.Service<Auth, { readonly userId: string }>()(
 // Tick-batched loader for resolving posts by authorId in augmentations.
 class PostsByAuthorLoader extends Context.Service<
   PostsByAuthorLoader,
-  GraphQL.Loader<string, Post[]>
+  GraphQL.Loader.Loader<string, Post[]>
 >()("blog/PostsByAuthorLoader") {}
 
 // ─────────────────────────────────────────────────────────────────────────────

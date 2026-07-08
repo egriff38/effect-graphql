@@ -3,7 +3,7 @@ import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
 import { Executor, Loader, Provider } from "../src/index.ts";
 
-class L extends Context.Service<L, Loader<string, string>>()("test/xreq/L") {}
+class L extends Context.Service<L, Loader.Loader<string, string>>()("test/xreq/L") {}
 
 describe("cross-request isolation", () => {
   it("gives each request its own loader cache and finalizes its scope", async () => {

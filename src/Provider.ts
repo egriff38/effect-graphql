@@ -1,20 +1,21 @@
-// Provider — describe a GraphQL API from Effect Schemas and Effect resolvers.
-//
-// A Provider is *description*: schemas, resolvers, and the two Layers (app + request) that
-// satisfy the resolvers' `R`. It's cheap to build; it doesn't materialize a runtime.
-//
-// Downstream helpers:
-//   - `Executor.make(provider)`      — manual execution (tests, custom transports)
-//   - `Provider.serve(provider)`     — effect-platform HttpApp (paved-path GraphQL server)
-//   - `Provider.toRpcGroup(provider)`, `Provider.rpcHandlersLayer(provider)`,
-//     `Provider.rpcServerLayer(provider, opts)` — reify the Provider's root operations as
-//     Effect RPC artifacts, without introducing a name that shadows `effect/unstable/rpc`.
-//
-// Per-tag typing: `Provider.field` and `Provider.augment` carry their `Rpc.make(...)` type
-// out via `Field<RPC, R>` / `Augment<S, RPC, R>`. `Provider.make` accumulates the union of
-// every root op's RPC type into the Provider's `Rpcs` phantom, which the RPC helpers below
-// surface without casts.
-
+/**
+ * Describe a GraphQL API from Effect Schemas and Effect resolvers. A `Provider`
+ * is *description*: schemas, resolvers, and the two Layers (app + request) that
+ * satisfy the resolvers' `R`. It's cheap to build; it doesn't materialize a runtime.
+ *
+ * Downstream helpers:
+ *   - `Executor.make(provider)` — manual execution (tests, custom transports)
+ *   - `Provider.serve(provider)` — effect-platform HttpApp (paved-path GraphQL server)
+ *   - `Provider.toRpcGroup` / `rpcHandlersLayer` / `rpcServerLayer` — reify the
+ *     Provider's root operations as Effect RPC artifacts.
+ *
+ * Per-tag typing: `Provider.field` and `Provider.augment` carry their
+ * `Rpc.make(...)` type out via `Provider.Field<RPC, R>` / `Provider.Augment<S, RPC, R>`.
+ * `Provider.make` accumulates the union of every root op's RPC type into the
+ * Provider's `Rpcs` phantom, which the RPC helpers surface without casts.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Layer, Record as Rec, SchemaAST as AST } from "effect";
 import type { Schema } from "effect";
 import type { NoInfer } from "effect/Types";
@@ -34,11 +35,27 @@ import { make as makeExecutor } from "./Executor.ts";
 /**
  * A typed root field. Pairs an `Rpc.make(...)` result with a resolver whose
  * payload, success, and error are derived from the rpc's schemas via
- * `Rpc.Payload<R>`/`Rpc.Success<R>`/`Rpc.Error<R>`.
+ * `Rpc.Payload<R>` / `Rpc.Success<R>` / `Rpc.Error<R>`.
  *
  * The phantom `RPC` parameter is what `Provider.make` reads via mapped types
- * to build the union of every root op, which `Rpc.toGroup` then surfaces as
- * `RpcGroup<Rpcs>`.
+ * to accumulate the union of every root op, which `Provider.toRpcGroup` surfaces
+ * as `RpcGroup<Rpcs>` without casts.
+ *
+ * @example
+ * import { Effect, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ *
+ * const me: Provider.Field<Rpc.Rpc<"me", never, typeof User>, never> =
+ *   Provider.field({
+ *     rpc: Rpc.make("me", { success: User }),
+ *     resolve: () => Effect.succeed(new User({ id: "u1" })),
+ *   })
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Field<out RPC extends Rpc.Any, out R> extends InternalField<R> {
   readonly rpc: RPC;
@@ -46,7 +63,26 @@ export interface Field<out RPC extends Rpc.Any, out R> extends InternalField<R> 
 
 /**
  * A typed augmentation: a relationship field layered onto a parent schema.
- * Carries both the parent shape and the rpc type.
+ * Carries both the parent shape and the rpc type so `Provider.make` can pick
+ * up the union of every augment's rpc alongside the root ops.
+ *
+ * @example
+ * import { Effect, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ * class Post extends Schema.Class<Post>("Post")({ id: Schema.String, authorId: Schema.String }) {}
+ *
+ * const authorAugment: Provider.Augment<typeof Post, Rpc.Rpc<"author", never, typeof User>, never> =
+ *   Provider.augment(
+ *     Post,
+ *     Rpc.make("author", { success: User }),
+ *     (post) => Effect.succeed(new User({ id: post.authorId })),
+ *   )
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Augment<out S extends Schema.Top, out RPC extends Rpc.Any, out R>
   extends InternalAugment<R>
@@ -62,12 +98,27 @@ const withGuards = <A, E, R>(
 ): Effect.Effect<A, E, R> => (guards && guards.length > 0 ? Effect.flatMap(Effect.all(guards), () => body) : body);
 
 /**
- * Declare a root operation (query/mutation field).
+ * Declare a root operation (a query or mutation field).
  *
  * The resolver's signature is derived from `options.rpc`'s schemas — the rpc
  * drives inference (`NoInfer` on the resolver positions). Guards may fail with
  * the rpc's declared error type; widening their error union requires extending
  * the rpc's `error` schema.
+ *
+ * @example
+ * import { Effect, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String, name: Schema.String }) {}
+ *
+ * const me = Provider.field({
+ *   rpc: Rpc.make("me", { success: User }),
+ *   resolve: () => Effect.succeed(new User({ id: "u1", name: "Ada" })),
+ * })
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const field = <
   const RPC extends Rpc.Any,
@@ -95,7 +146,29 @@ export const field = <
   return internal as Field<RPC, R>;
 };
 
-/** Layer a relationship field onto `schema` (by its identifier). `self` is the parent. */
+/**
+ * Layer a relationship field onto `schema` (by its identifier). `self` receives
+ * the parent object; the resolver returns the related value(s). Augmentations
+ * enable graph traversal (`Post.author`, `User.posts`) without editing the
+ * schema classes.
+ *
+ * @example
+ * import { Effect, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ * class Post extends Schema.Class<Post>("Post")({ id: Schema.String, authorId: Schema.String }) {}
+ *
+ * const postAuthor = Provider.augment(
+ *   Post,
+ *   Rpc.make("author", { success: User }),
+ *   (post) => Effect.succeed(new User({ id: post.authorId })),
+ * )
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const augment = <
   S extends Schema.Top,
   const RPC extends Rpc.Any,
@@ -142,10 +215,26 @@ type FieldRpcs<F> = F extends Record<string, Field<infer RPC, any>> ? RPC : neve
 /** Extracts the union of RPC types from an array of `Augment` values. */
 type AugmentRpcs<A> = A extends ReadonlyArray<Augment<any, infer RPC, any>> ? RPC : never;
 
+/**
+ * Configuration record for `Provider.make`. `AppR` is inferred only from
+ * `app`; `ReqR` only from `request`'s output; the field/augment positions are
+ * `NoInfer` so they validate (resolver requirements ⊆ `AppR | ReqR`) without
+ * polluting inference.
+ *
+ * @example
+ * import { Layer } from "effect"
+ * import type { Provider } from "effect-graphql"
+ *
+ * const config: Provider.Config<never, never, never> = {
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {},
+ * }
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Config<AppR, ReqR, E> {
-  // `AppR` is inferred only from `app`, `ReqR` only from `request`'s output; the other
-  // positions are `NoInfer` so they validate (resolver requirements ⊆ AppR | ReqR) without
-  // polluting inference (otherwise `request`'s RIn could degenerately fix `AppR`).
   readonly app: Layer.Layer<AppR, E, never>;
   readonly request: Layer.Layer<ReqR, E, ProviderRequest | NoInfer<AppR>>;
   readonly query: Record<string, Field<Rpc.Any, NoInfer<AppR> | NoInfer<ReqR>>>;
@@ -157,11 +246,25 @@ export interface Config<AppR, ReqR, E> {
 declare const RpcsPhantom: unique symbol;
 
 /**
- * A Provider value, parameterised by:
- *   AppR  — services satisfied by the app Layer
- *   ReqR  — services produced by the per-request Layer
- *   E     — error type emitted by either layer
- *   Rpcs  — union of every root op's `Rpc.make(...)` type (phantom; flows to Rpc.toGroup)
+ * A Provider value. Parameterised by:
+ *
+ *   - `AppR` — services satisfied by the app Layer
+ *   - `ReqR` — services produced by the per-request Layer
+ *   - `E`    — error type emitted by either layer
+ *   - `Rpcs` — union of every root op's `Rpc.make(...)` type (phantom; flows to `toRpcGroup`)
+ *
+ * @example
+ * import { Layer } from "effect"
+ * import { Provider } from "effect-graphql"
+ *
+ * const p: Provider.Provider<never, never, never> = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {},
+ * })
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Provider<AppR, ReqR, E, out Rpcs extends Rpc.Any = Rpc.Any> {
   readonly config: Config<AppR, ReqR, E>;
@@ -169,6 +272,33 @@ export interface Provider<AppR, ReqR, E, out Rpcs extends Rpc.Any = Rpc.Any> {
   readonly [RpcsPhantom]: (_: never) => Rpcs;
 }
 
+/**
+ * Construct a Provider from an app Layer, a per-request Layer, and the root
+ * operations (queries, mutations, augmentations). The resulting Provider's
+ * `Rpcs` phantom carries the union of every root op's rpc type — downstream
+ * `Provider.toRpcGroup` uses it to produce a per-tag typed `RpcGroup<Rpcs>`.
+ *
+ * @example
+ * import { Effect, Layer, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {
+ *     me: Provider.field({
+ *       rpc: Rpc.make("me", { success: User }),
+ *       resolve: () => Effect.succeed(new User({ id: "u1" })),
+ *     }),
+ *   },
+ * })
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = <
   AppR,
   ReqR,
@@ -189,6 +319,29 @@ export const make = <
 // toSchema — pure Provider -> GraphQLSchema transform (no runtime)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Reduce a Provider to a raw `GraphQLSchema` — a pure description-to-description
+ * transform, no runtime materialized. Useful for tooling (SDL printing) or for
+ * plugging the schema into a foreign server (Yoga, Apollo, Mercurius). The
+ * resolvers on this schema depend on the two-tier runtime that only
+ * `Executor.make` supplies, so calling `graphql()` on the raw schema directly
+ * will fail — use `Executor.make(provider)` or `Provider.serve(provider)`.
+ *
+ * @example
+ * import { Layer } from "effect"
+ * import { printSchema } from "graphql"
+ * import { Provider } from "effect-graphql"
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {},
+ * })
+ * const sdl = printSchema(Provider.toSchema(provider))
+ *
+ * @category destructors
+ * @since 0.1.0
+ */
 export const toSchema = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
 ): GraphQLSchema =>
@@ -200,11 +353,6 @@ export const toSchema = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // serve — effect-platform HttpApp
-//
-// The paved-path one-liner. Reads a GraphQL request from the body, bridges it to a
-// ProviderRequest, executes through the two-tier runtime, and returns JSON. Internally
-// builds one Executor (the app runtime materializes once when serve is called and is
-// reused per request).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
@@ -214,6 +362,28 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
+/**
+ * The paved-path effect-platform `HttpApp` serving the Provider: reads a
+ * GraphQL request from the body, bridges it to a `ProviderRequest`, executes
+ * through the two-tier runtime, and returns JSON. Internally builds one
+ * `Executor` (the app runtime materializes once when `serve` is called and is
+ * reused per request). Mount it under any `HttpRouter` route.
+ *
+ * @example
+ * import { Layer } from "effect"
+ * import { HttpRouter } from "effect/unstable/http"
+ * import { Provider } from "effect-graphql"
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {},
+ * })
+ * const router = HttpRouter.add("POST", "/graphql", Provider.serve(provider))
+ *
+ * @category destructors
+ * @since 0.1.0
+ */
 export const serve = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
   hardening?: HardeningOptions,
@@ -249,8 +419,32 @@ const rootFields = <R>(config: {
 }): Record<string, InternalField<R>> => ({ ...config.query, ...config.mutation });
 
 /**
- * Reify the Provider's root operations as an Effect `RpcGroup`. Per-tag typing survives:
- * the returned group is `RpcGroup<Rpcs>` where `Rpcs` was accumulated by `Provider.make`.
+ * Reify the Provider's root operations as an Effect `RpcGroup`. Per-tag typing
+ * survives: the returned group is `RpcGroup<Rpcs>` where `Rpcs` was accumulated
+ * by `Provider.make` — an `RpcClient.make(...)` on the result gets per-tag
+ * typing without explicit casts.
+ *
+ * @example
+ * import { Effect, Layer, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {
+ *     me: Provider.field({
+ *       rpc: Rpc.make("me", { success: User }),
+ *       resolve: () => Effect.succeed(new User({ id: "u1" })),
+ *     }),
+ *   },
+ * })
+ * const group = Provider.toRpcGroup(provider)
+ *
+ * @category destructors
+ * @since 0.1.0
  */
 export const toRpcGroup = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
@@ -259,9 +453,33 @@ export const toRpcGroup = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
     unknown as RpcGroup.RpcGroup<Rpcs>;
 
 /**
- * Build a Layer providing the handler for every rpc in the Provider's group. Each handler
- * builds a per-request Context from the rpc's headers (mirroring what the GraphQL adapter
- * does from HTTP headers) and runs the field's resolver through the two-tier runtime.
+ * Build a Layer providing the handler for every rpc in the Provider's group.
+ * Each handler builds a per-request Context from the rpc's headers (mirroring
+ * what the GraphQL adapter does from HTTP headers) and runs the field's
+ * resolver through the two-tier runtime. Pair with `RpcTest.makeClient(...)`
+ * for in-memory testing.
+ *
+ * @example
+ * import { Effect, Layer, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {
+ *     me: Provider.field({
+ *       rpc: Rpc.make("me", { success: User }),
+ *       resolve: () => Effect.succeed(new User({ id: "u1" })),
+ *     }),
+ *   },
+ * })
+ * const layer = Provider.rpcHandlersLayer(provider)
+ *
+ * @category destructors
+ * @since 0.1.0
  */
 export const rpcHandlersLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,
@@ -297,9 +515,32 @@ export const rpcHandlersLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
 };
 
 /**
- * Layer that mounts an rpc server on `options.path`. Consumes `HttpRouter.HttpRouter` from
- * the runtime; requires nothing else because the handlers layer and JSON serialization are
- * provided internally.
+ * Layer that mounts an rpc server on `options.path`. Consumes `HttpRouter` from
+ * the runtime; provides the handlers layer and JSON serialization internally.
+ * Combine with an `HttpRouter` + `HttpServer` layer stack to serve the RPC
+ * surface over HTTP.
+ *
+ * @example
+ * import { Effect, Layer, Schema } from "effect"
+ * import { Rpc } from "effect/unstable/rpc"
+ * import { Provider } from "effect-graphql"
+ *
+ * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
+ *
+ * const provider = Provider.make({
+ *   app: Layer.empty,
+ *   request: Layer.empty,
+ *   query: {
+ *     me: Provider.field({
+ *       rpc: Rpc.make("me", { success: User }),
+ *       resolve: () => Effect.succeed(new User({ id: "u1" })),
+ *     }),
+ *   },
+ * })
+ * const server = Provider.rpcServerLayer(provider, { path: "/rpc" })
+ *
+ * @category destructors
+ * @since 0.1.0
  */
 export const rpcServerLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   provider: Provider<AppR, ReqR, E, Rpcs>,

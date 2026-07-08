@@ -33,26 +33,26 @@ class Auth extends Context.Service<Auth, { readonly userId: string | null }>()(
 ) {}
 
 /** Load users by id, batched per tick. Used by Post.author and Comment.author. */
-class UserByIdLoader extends Context.Service<UserByIdLoader, Loader<string, User | null>>()(
+class UserByIdLoader extends Context.Service<UserByIdLoader, Loader.Loader<string, User | null>>()(
   "blog/UserByIdLoader",
 ) {}
 
 /** Load all comments for a post id, batched. Used by Post.comments. */
 class CommentsByPostLoader extends Context.Service<
   CommentsByPostLoader,
-  Loader<string, ReadonlyArray<Comment>>
+  Loader.Loader<string, ReadonlyArray<Comment>>
 >()("blog/CommentsByPostLoader") {}
 
 /** Load all comments authored by a user id, batched. Used by User.comments. */
 class CommentsByUserLoader extends Context.Service<
   CommentsByUserLoader,
-  Loader<string, ReadonlyArray<Comment>>
+  Loader.Loader<string, ReadonlyArray<Comment>>
 >()("blog/CommentsByUserLoader") {}
 
 /** Load all posts authored by a user id, batched. Used by User.posts. */
 class PostsByAuthorLoader extends Context.Service<
   PostsByAuthorLoader,
-  Loader<string, ReadonlyArray<Post>>
+  Loader.Loader<string, ReadonlyArray<Post>>
 >()("blog/PostsByAuthorLoader") {}
 
 const RequestLayer = Layer.mergeAll(
