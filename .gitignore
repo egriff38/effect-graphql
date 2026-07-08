@@ -1,8 +1,14 @@
 node_modules
 coverage
-dist
 *.tgz
-docs/modules
-docs/examples
-docs/_config.yml
-docs/index.md
+
+# Build outputs (per-package)
+packages/*/dist
+packages/*/coverage
+
+# Docgen output (regenerated per build)
+packages/core/docs/modules
+packages/core/docs/examples
+packages/core/docs/_config.yml
+packages/core/docs/index.md
+packages/core/docs/CNAME

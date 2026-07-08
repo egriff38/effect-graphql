@@ -37,6 +37,7 @@ jobs:
       # rendered site.
 
       - name: Scope Jekyll to modules only (exclude adr/)
+        working-directory: packages/core
         run: |
           cat >> docs/_config.yml <<'EOF'
 
@@ -47,6 +48,7 @@ jobs:
           EOF
 
       - name: Write the site landing page
+        working-directory: packages/core
         run: |
           cat > docs/index.md <<'EOF'
           ---
@@ -123,6 +125,7 @@ jobs:
           EOF
 
       - name: Expand `effect://` link shorthand
+        working-directory: packages/core
         run: |
           # JSDoc authors can write `{@link effect://Layer}` to point at
           # https://effect-ts.github.io/effect/effect/Layer.ts.html without
@@ -141,12 +144,13 @@ jobs:
         # it into `docs/` (the Jekyll source) before the build sidesteps the
         # post-build permission issue where the Jekyll container writes
         # `_site/` as root.
+        working-directory: packages/core
         run: echo "effect-graphql.js.org" > docs/CNAME
 
       - name: Build Jekyll site
         uses: actions/jekyll-build-pages@v1
         with:
-          source: ./docs
+          source: ./packages/core/docs
           destination: ./_site
 
       - name: Upload pages artifact

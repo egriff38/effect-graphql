@@ -19,7 +19,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc, RpcTest } from "effect/unstable/rpc";
 import { printSchema } from "graphql";
-import * as GraphQL from "../src/index.ts";
+import * as GraphQL from "../packages/core/src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Schema types

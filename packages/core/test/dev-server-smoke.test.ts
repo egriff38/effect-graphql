@@ -30,6 +30,7 @@ const waitForListen = (proc: ChildProcess): Promise<void> =>
 
 beforeAll(async () => {
   server = spawn("bun", ["examples/dev-server/main.ts"], {
+    cwd: `${import.meta.dirname}/../../..`,
     env: { ...process.env, PORT: String(PORT) },
     stdio: ["ignore", "pipe", "pipe"],
   });

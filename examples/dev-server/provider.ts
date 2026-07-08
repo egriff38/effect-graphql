@@ -12,7 +12,7 @@
 
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
-import { Loader, Provider, ProviderRequest } from "../../src/index.ts";
+import { Loader, Provider, ProviderRequest } from "../../packages/core/src/index.ts";
 import {
   Comment,
   CreatePostInput,

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# release.sh — cut a release.
+# release.sh — cut a release of packages/core (the published `effect-graphql`).
 #
 # Usage:
-#   ./release.sh patch     # 0.1.0 -> 0.1.1
-#   ./release.sh minor     # 0.1.0 -> 0.2.0
-#   ./release.sh major     # 0.1.0 -> 1.0.0
-#   ./release.sh 0.2.0-rc.1  # explicit version
+#   ./release.sh patch     # 0.2.1 -> 0.2.2
+#   ./release.sh minor     # 0.2.1 -> 0.3.0
+#   ./release.sh major     # 0.2.1 -> 1.0.0
+#   ./release.sh 0.3.0-rc.1  # explicit version
 #
 # The script:
 #   1. Verifies the working tree is clean and on master.
-#   2. Runs the full verify chain (typecheck + test + build).
-#   3. Bumps package.json version, commits the bump, tags it.
+#   2. Runs the full verify chain (typecheck + test + build) at the workspace root.
+#   3. Bumps packages/core/package.json version, commits the bump, tags it.
 #   4. Pushes commit + tag.
-#   5. Publishes to npm.
+#   5. Publishes packages/core to npm.
 #
-# Requires: npm auth (`npm whoami`), bun, gh (for release notes).
+# Requires: npm auth (`npm whoami`), bun.
 
 set -euo pipefail
 
@@ -37,7 +37,7 @@ if [ "$BRANCH" != "master" ]; then
   exit 1
 fi
 
-# 2. Verify chain — same as CI runs
+# 2. Verify chain — same as CI runs, from the workspace root so `bun --filter` fans out.
 echo "==> typecheck"
 bun run typecheck
 echo "==> test"
@@ -45,12 +45,13 @@ bun run test
 echo "==> build"
 bun run build
 
-# 3. Bump + commit + tag
+# 3. Bump + commit + tag — package.json inside packages/core, tag is repo-wide.
+cd packages/core
 NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
-# npm version prefixes with 'v', strip for the commit message
 VERSION="${NEW_VERSION#v}"
+cd - > /dev/null
 
-git add package.json
+git add packages/core/package.json
 git commit -m "chore(release): $VERSION"
 git tag -a "$NEW_VERSION" -m "$VERSION"
 
@@ -59,9 +60,11 @@ echo "==> pushing to origin"
 git push origin master
 git push origin "$NEW_VERSION"
 
-# 5. Publish
+# 5. Publish from packages/core
 echo "==> npm publish"
+cd packages/core
 npm publish --access public
+cd - > /dev/null
 
 echo ""
 echo "released $VERSION"

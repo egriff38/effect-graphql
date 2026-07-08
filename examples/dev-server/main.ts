@@ -22,8 +22,8 @@
 import { Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { Provider } from "../../src/index.ts";
-import { graphiql } from "../../src/graphiql.ts";
+import { Provider } from "../../packages/core/src/index.ts";
+import { graphiql } from "../../packages/core/src/graphiql.ts";
 import { provider } from "./provider.ts";
 
 // Routes — both endpoints under the same router.

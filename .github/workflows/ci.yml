@@ -33,5 +33,5 @@ jobs:
         run: bun run docgen
 
       - name: Package (dry-run)
-        run: |
-          npm pack --dry-run
+        working-directory: packages/core
+        run: npm pack --dry-run

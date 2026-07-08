@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "lib": ["ESNext"]
+    "lib": ["ESNext", "DOM"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "prototype/**/*.ts", "vitest.config.ts"]
+  "include": []
 }
