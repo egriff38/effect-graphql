@@ -6,15 +6,11 @@ exports[`public API surface (#9) > matches the recorded snapshot 1`] = `
     "Executor": [
       "make",
     ],
-    "Loader": [
-      "make",
-    ],
     "Provider": [
       "augment",
       "field",
       "make",
       "rpcHandlersLayer",
-      "rpcServerLayer",
       "serve",
       "toRpcGroup",
       "toSchema",
@@ -22,7 +18,6 @@ exports[`public API surface (#9) > matches the recorded snapshot 1`] = `
   },
   "topLevelExports": [
     "Executor",
-    "Loader",
     "Provider",
     "ProviderRequest",
   ],

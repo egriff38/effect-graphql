@@ -20,9 +20,8 @@ import { Effect, Layer, Record as Rec, SchemaAST as AST } from "effect";
 import type { Schema } from "effect";
 import type { NoInfer } from "effect/Types";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-import type { HttpRouter } from "effect/unstable/http";
 import type { GraphQLSchema } from "graphql";
-import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { ProviderRequest } from "./ProviderRequest.ts";
 import { deriveSchema, type InternalAugment, type InternalField } from "./internal/derive.ts";
 import type { HardeningOptions } from "./internal/hardening.ts";
@@ -514,49 +513,3 @@ export const rpcHandlersLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   return layer as unknown as Layer.Layer<Rpc.ToHandler<Rpcs>, E, never>;
 };
 
-/**
- * Layer that mounts an rpc server on `options.path`. Consumes `HttpRouter` from
- * the runtime; provides the handlers layer and JSON serialization internally.
- * Combine with an `HttpRouter` + `HttpServer` layer stack to serve the RPC
- * surface over HTTP.
- *
- * @example
- * import { Effect, Layer, Schema } from "effect"
- * import { Rpc } from "effect/unstable/rpc"
- * import { Provider } from "effect-graphql"
- *
- * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
- *
- * const provider = Provider.make({
- *   app: Layer.empty,
- *   request: Layer.empty,
- *   query: {
- *     me: Provider.field({
- *       rpc: Rpc.make("me", { success: User }),
- *       resolve: () => Effect.succeed(new User({ id: "u1" })),
- *     }),
- *   },
- * })
- * const server = Provider.rpcServerLayer(provider, { path: "/rpc" })
- *
- * @category destructors
- * @since 0.1.0
- */
-export const rpcServerLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
-  provider: Provider<AppR, ReqR, E, Rpcs>,
-  options: {
-    readonly path: HttpRouter.PathInput;
-    readonly protocol?: "http" | "websocket" | undefined;
-  },
-): Layer.Layer<
-  never,
-  E,
-  HttpRouter.HttpRouter | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>
-> =>
-  RpcServer.layerHttp({
-    group: toRpcGroup(provider),
-    path: options.path,
-    protocol: options.protocol ?? "http",
-  }).pipe(
-    Layer.provide([rpcHandlersLayer(provider), RpcSerialization.layerJson]),
-  );

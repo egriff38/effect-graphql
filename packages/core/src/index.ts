@@ -37,9 +37,3 @@ export * as Provider from "./Provider.ts";
  */
 export * as Executor from "./Executor.ts";
 
-/**
- * Request-scoped tick-batched loader (DataLoader semantics). See {@link Loader}.
- *
- * @since 0.2.0
- */
-export * as Loader from "./Loader.ts";
