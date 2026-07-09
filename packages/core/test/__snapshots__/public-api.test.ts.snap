@@ -8,6 +8,7 @@ exports[`public API surface (#9) > matches the recorded snapshot 1`] = `
     ],
     "Provider": [
       "augment",
+      "batch",
       "field",
       "make",
       "rpcHandlersLayer",

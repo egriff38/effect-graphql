@@ -16,7 +16,7 @@
  * Run:  bunx tsx examples/blog.ts
  */
 
-import { Context, Effect, Layer, Request, RequestResolver, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc, RpcTest } from "effect/unstable/rpc";
 import { printSchema } from "graphql";
 import * as GraphQL from "../packages/core/src/index.ts";
@@ -73,18 +73,15 @@ class Auth extends Context.Service<Auth, { readonly userId: string }>()(
   "blog/Auth",
 ) {}
 
-// Batched resolver for looking up posts by authorId in augmentations.
-// See <https://effect.website> — RequestResolver + Effect.request coalesces
-// concurrent requests in the same fiber tree into one batch call.
-interface LoadPostsByAuthor extends Request.Request<Post[]> {
-  readonly _tag: "LoadPostsByAuthor";
-  readonly authorId: string;
-}
-const LoadPostsByAuthor = Request.tagged<LoadPostsByAuthor>("LoadPostsByAuthor");
-class PostsByAuthorResolver extends Context.Service<
-  PostsByAuthorResolver,
-  RequestResolver.RequestResolver<LoadPostsByAuthor>
->()("blog/PostsByAuthorResolver") {}
+// Batched loader for looking up posts by authorId in augmentations.
+// `Provider.batch` returns a callable; concurrent same-tick calls collapse
+// into one `runAll` batch. `.tag` and `.resolver` are exposed for advanced
+// combinators (setDelay, batchN, withSpan, withCache).
+const loadPostsByAuthor = GraphQL.Provider.batch(
+  "LoadPostsByAuthor",
+  (payloads: ReadonlyArray<{ authorId: string }>) =>
+    payloads.map((p) => POSTS.filter((post) => post.authorId === p.authorId)),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. Guards
@@ -110,20 +107,10 @@ export const provider = GraphQL.Provider.make({
   // Request layer: rebuilt per-request from ProviderRequest (headers, method, url, body).
   // Both the GraphQL adapter and the RPC bridge populate ProviderRequest, so this layer
   // is transport-agnostic.
-  request: Layer.merge(
-    // Auth: read the caller's identity from the request header.
-    Layer.effect(Auth)(
-      Effect.map(GraphQL.ProviderRequest, (req) => ({
-        userId: req.headers["x-user"] ?? "",
-      })),
-    ),
-    // Batched resolver: coalesces N author lookups across sibling resolvers
-    // into a single batch call.
-    Layer.succeed(PostsByAuthorResolver)(
-      RequestResolver.fromFunctionBatched<LoadPostsByAuthor>((entries) =>
-        entries.map((e) => POSTS.filter((p) => p.authorId === e.request.authorId)),
-      ),
-    ),
+  request: Layer.effect(Auth)(
+    Effect.map(GraphQL.ProviderRequest, (req) => ({
+      userId: req.headers["x-user"] ?? "",
+    })),
   ),
 
   // Root queries.
@@ -220,15 +207,12 @@ export const provider = GraphQL.Provider.make({
         }),
     ),
 
-    // User.posts — resolve all posts for a user; batched via the shared
-    // PostsByAuthorResolver so concurrent calls collapse into one batch.
+    // User.posts — resolve all posts for a user; concurrent same-tick calls
+    // collapse into one batched runAll.
     GraphQL.Provider.augment(
       User,
       Rpc.make("posts", { success: Schema.Array(Post) }),
-      (user) =>
-        Effect.flatMap(PostsByAuthorResolver, (resolver) =>
-          Effect.request(LoadPostsByAuthor({ authorId: user.id }), resolver),
-        ),
+      (user) => loadPostsByAuthor({ authorId: user.id }),
     ),
   ],
 });
