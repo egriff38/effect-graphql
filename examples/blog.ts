@@ -73,11 +73,15 @@ class Auth extends Context.Service<Auth, { readonly userId: string }>()(
   "blog/Auth",
 ) {}
 
-// Tick-batched loader for resolving posts by authorId in augmentations.
-class PostsByAuthorLoader extends Context.Service<
-  PostsByAuthorLoader,
-  GraphQL.Loader.Loader<string, Post[]>
->()("blog/PostsByAuthorLoader") {}
+// Batched loader for looking up posts by authorId in augmentations.
+// `Provider.batch` returns a callable; concurrent same-tick calls collapse
+// into one `runAll` batch. `.tag` and `.resolver` are exposed for advanced
+// combinators (setDelay, batchN, withSpan, withCache).
+const loadPostsByAuthor = GraphQL.Provider.batch(
+  "LoadPostsByAuthor",
+  (payloads: ReadonlyArray<{ authorId: string }>) =>
+    payloads.map((p) => POSTS.filter((post) => post.authorId === p.authorId)),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. Guards
@@ -103,22 +107,10 @@ export const provider = GraphQL.Provider.make({
   // Request layer: rebuilt per-request from ProviderRequest (headers, method, url, body).
   // Both the GraphQL adapter and the RPC bridge populate ProviderRequest, so this layer
   // is transport-agnostic.
-  request: Layer.merge(
-    // Auth: read the caller's identity from the request header.
-    Layer.effect(Auth)(
-      Effect.map(GraphQL.ProviderRequest, (req) => ({
-        userId: req.headers["x-user"] ?? "",
-      })),
-    ),
-    // PostsByAuthorLoader: a tick-batched loader that coalesces N author lookups
-    // across sibling resolvers into a single batch call.
-    Layer.effect(PostsByAuthorLoader)(
-      GraphQL.Loader.make((authorIds: ReadonlyArray<string>) =>
-        Effect.succeed(
-          authorIds.map((id) => POSTS.filter((p) => p.authorId === id)),
-        ),
-      ),
-    ),
+  request: Layer.effect(Auth)(
+    Effect.map(GraphQL.ProviderRequest, (req) => ({
+      userId: req.headers["x-user"] ?? "",
+    })),
   ),
 
   // Root queries.
@@ -215,15 +207,12 @@ export const provider = GraphQL.Provider.make({
         }),
     ),
 
-    // User.posts — resolve all posts for a user; batched via PostsByAuthorLoader.
+    // User.posts — resolve all posts for a user; concurrent same-tick calls
+    // collapse into one batched runAll.
     GraphQL.Provider.augment(
       User,
       Rpc.make("posts", { success: Schema.Array(Post) }),
-      (user) =>
-        Effect.gen(function* () {
-          const loader = yield* PostsByAuthorLoader;
-          return yield* loader.load(user.id);
-        }),
+      (user) => loadPostsByAuthor({ authorId: user.id }),
     ),
   ],
 });

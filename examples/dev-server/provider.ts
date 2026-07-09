@@ -3,16 +3,21 @@
  *
  *  - app layer: empty (no app-scoped services here; in production this is where
  *    DB pools and config Layers go)
- *  - request layer: Auth (from x-user header) + per-request loaders that
- *    coalesce N+1 augmentation lookups into one batch
+ *  - request layer: Auth (from x-user header)
  *  - root operations (queries + mutation)
  *  - augmentations on User, Post, and Comment forming a cyclic capability graph
  *    (User.posts → Post.author → User, Post.comments → Comment.post → Post, …)
+ *
+ * Batching pattern: each many-to-one lookup is a `Provider.batch(...)` loader —
+ * a thin sugar over Effect's `Request.tagged` + `RequestResolver.fromFunctionBatched`.
+ * Loaders are callable directly; concurrent same-tick calls coalesce into one
+ * `runAll` batch. Every `RequestResolver` combinator (setDelay, batchN,
+ * withSpan, withCache) remains reachable via `loader.resolver`.
  */
 
 import { Context, Effect, Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
-import { Loader, Provider, ProviderRequest } from "../../packages/core/src/index.ts";
+import { Provider, ProviderRequest } from "../../packages/core/src/index.ts";
 import {
   Comment,
   CreatePostInput,
@@ -25,63 +30,46 @@ import {
 import { COMMENTS, createPost as storeCreatePost, POSTS, USERS } from "./store.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Request-scoped services
+// Auth
 // ─────────────────────────────────────────────────────────────────────────────
 
 class Auth extends Context.Service<Auth, { readonly userId: string | null }>()(
   "blog/Auth",
 ) {}
 
-/** Load users by id, batched per tick. Used by Post.author and Comment.author. */
-class UserByIdLoader extends Context.Service<UserByIdLoader, Loader.Loader<string, User | null>>()(
-  "blog/UserByIdLoader",
-) {}
+// ─────────────────────────────────────────────────────────────────────────────
+// Batched loaders — one per relationship the schema traverses
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Load all comments for a post id, batched. Used by Post.comments. */
-class CommentsByPostLoader extends Context.Service<
-  CommentsByPostLoader,
-  Loader.Loader<string, ReadonlyArray<Comment>>
->()("blog/CommentsByPostLoader") {}
+const loadUser = Provider.batch(
+  "LoadUser",
+  (payloads: ReadonlyArray<{ id: string }>) =>
+    payloads.map((p) => USERS.find((u) => u.id === p.id) ?? null),
+);
 
-/** Load all comments authored by a user id, batched. Used by User.comments. */
-class CommentsByUserLoader extends Context.Service<
-  CommentsByUserLoader,
-  Loader.Loader<string, ReadonlyArray<Comment>>
->()("blog/CommentsByUserLoader") {}
+const loadCommentsByPost = Provider.batch(
+  "LoadCommentsByPost",
+  (payloads: ReadonlyArray<{ postId: string }>) =>
+    payloads.map((p) => COMMENTS.filter((c) => c.postId === p.postId)),
+);
 
-/** Load all posts authored by a user id, batched. Used by User.posts. */
-class PostsByAuthorLoader extends Context.Service<
-  PostsByAuthorLoader,
-  Loader.Loader<string, ReadonlyArray<Post>>
->()("blog/PostsByAuthorLoader") {}
+const loadCommentsByUser = Provider.batch(
+  "LoadCommentsByUser",
+  (payloads: ReadonlyArray<{ userId: string }>) =>
+    payloads.map((p) => COMMENTS.filter((c) => c.authorId === p.userId)),
+);
 
-const RequestLayer = Layer.mergeAll(
-  Layer.effect(Auth)(
-    Effect.map(ProviderRequest, (req) => {
-      const userId = req.headers["x-user"];
-      return { userId: typeof userId === "string" && userId !== "" ? userId : null };
-    }),
-  ),
-  Layer.effect(UserByIdLoader)(
-    Loader.make((ids: ReadonlyArray<string>) =>
-      Effect.sync(() => ids.map((id) => USERS.find((u) => u.id === id) ?? null))
-    ),
-  ),
-  Layer.effect(CommentsByPostLoader)(
-    Loader.make((postIds: ReadonlyArray<string>) =>
-      Effect.sync(() => postIds.map((id) => COMMENTS.filter((c) => c.postId === id)))
-    ),
-  ),
-  Layer.effect(CommentsByUserLoader)(
-    Loader.make((userIds: ReadonlyArray<string>) =>
-      Effect.sync(() => userIds.map((id) => COMMENTS.filter((c) => c.authorId === id)))
-    ),
-  ),
-  Layer.effect(PostsByAuthorLoader)(
-    Loader.make((userIds: ReadonlyArray<string>) =>
-      Effect.sync(() => userIds.map((id) => POSTS.filter((p) => p.authorId === id)))
-    ),
-  ),
+const loadPostsByAuthor = Provider.batch(
+  "LoadPostsByAuthor",
+  (payloads: ReadonlyArray<{ userId: string }>) =>
+    payloads.map((p) => POSTS.filter((post) => post.authorId === p.userId)),
+);
+
+const RequestLayer = Layer.effect(Auth)(
+  Effect.map(ProviderRequest, (req) => {
+    const userId = req.headers["x-user"];
+    return { userId: typeof userId === "string" && userId !== "" ? userId : null };
+  }),
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,10 +99,8 @@ export const provider = Provider.make({
       resolve: () =>
         Effect.gen(function*() {
           const auth = yield* Auth;
-          // requireAuth guarantees userId !== null at this point
           const userId = auth.userId!;
-          const loader = yield* UserByIdLoader;
-          const user = yield* loader.load(userId);
+          const user = yield* loadUser({ id: userId });
           if (!user) {
             return yield* Effect.fail(
               new Forbidden({ _tag: "Forbidden", reason: `unknown user ${userId}` }),
@@ -133,8 +119,7 @@ export const provider = Provider.make({
       }),
       resolve: ({ id }) =>
         Effect.gen(function*() {
-          const loader = yield* UserByIdLoader;
-          const user = yield* loader.load(id);
+          const user = yield* loadUser({ id });
           if (!user) {
             return yield* Effect.fail(
               new NotFound({ _tag: "NotFound", message: `user ${id} not found` }),
@@ -144,19 +129,16 @@ export const provider = Provider.make({
         }),
     }),
 
-    // users — full list
     users: Provider.field({
       rpc: Rpc.make("users", { success: Schema.Array(User) }),
       resolve: () => Effect.succeed([...USERS]),
     }),
 
-    // posts — all posts
     posts: Provider.field({
       rpc: Rpc.make("posts", { success: Schema.Array(Post) }),
       resolve: () => Effect.succeed([...POSTS]),
     }),
 
-    // postsByStatus(status) — required enum filter (demonstrates enum in input position)
     postsByStatus: Provider.field({
       rpc: Rpc.make("postsByStatus", {
         payload: { status: PostStatus },
@@ -165,7 +147,6 @@ export const provider = Provider.make({
       resolve: ({ status }) => Effect.succeed(POSTS.filter((p) => p.status === status)),
     }),
 
-    // post(id) — single post lookup
     post: Provider.field({
       rpc: Rpc.make("post", {
         payload: { id: Schema.String },
@@ -182,8 +163,6 @@ export const provider = Provider.make({
   },
 
   mutation: {
-    // createPost(input) — auth-gated; structured input gets schema-validated
-    // before the resolver runs (NonEmptyString rejects empty title at the wire)
     createPost: Provider.field({
       rpc: Rpc.make("createPost", {
         payload: { input: CreatePostInput },
@@ -206,68 +185,48 @@ export const provider = Provider.make({
   },
 
   augmentations: [
-    // Post.author — typed-error result (post may reference deleted user)
     Provider.augment(
       Post,
       Rpc.make("author", { success: User, error: NotFound }),
       (post) =>
         Effect.gen(function*() {
-          const loader = yield* UserByIdLoader;
-          const author = yield* loader.load(post.authorId);
+          const author = yield* loadUser({ id: post.authorId });
           return author ?? (yield* Effect.fail(
             new NotFound({ _tag: "NotFound", message: `author ${post.authorId} not found` }),
           ));
         }),
     ),
 
-    // Post.comments — list of comments on the post (batched)
     Provider.augment(
       Post,
       Rpc.make("comments", { success: Schema.Array(Comment) }),
-      (post) =>
-        Effect.gen(function*() {
-          const loader = yield* CommentsByPostLoader;
-          return yield* loader.load(post.id);
-        }),
+      (post) => loadCommentsByPost({ postId: post.id }),
     ),
 
-    // User.posts — list of posts authored by this user (batched)
     Provider.augment(
       User,
       Rpc.make("posts", { success: Schema.Array(Post) }),
-      (user) =>
-        Effect.gen(function*() {
-          const loader = yield* PostsByAuthorLoader;
-          return yield* loader.load(user.id);
-        }),
+      (user) => loadPostsByAuthor({ userId: user.id }),
     ),
 
-    // User.comments — list of comments by this user (batched)
     Provider.augment(
       User,
       Rpc.make("comments", { success: Schema.Array(Comment) }),
-      (user) =>
-        Effect.gen(function*() {
-          const loader = yield* CommentsByUserLoader;
-          return yield* loader.load(user.id);
-        }),
+      (user) => loadCommentsByUser({ userId: user.id }),
     ),
 
-    // Comment.author — typed-error result (comment may reference deleted user)
     Provider.augment(
       Comment,
       Rpc.make("author", { success: User, error: NotFound }),
       (comment) =>
         Effect.gen(function*() {
-          const loader = yield* UserByIdLoader;
-          const author = yield* loader.load(comment.authorId);
+          const author = yield* loadUser({ id: comment.authorId });
           return author ?? (yield* Effect.fail(
             new NotFound({ _tag: "NotFound", message: `author ${comment.authorId} not found` }),
           ));
         }),
     ),
 
-    // Comment.post — typed-error result; not batched (lookup is by primary key)
     Provider.augment(
       Comment,
       Rpc.make("post", { success: Post, error: NotFound }),

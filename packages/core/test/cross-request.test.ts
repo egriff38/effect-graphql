@@ -1,36 +1,32 @@
-import { Context, Effect, Layer, Schema } from "effect";
+// Verifies that a module-scoped `Provider.batch` loader still isolates
+// non-overlapping requests: two sequential requests produce two separate
+// batches (they're in different event-loop ticks). Concurrent requests would
+// batch together — that's the intended cross-request coalescing behavior.
+
+import { Layer, Schema } from "effect";
 import { Rpc } from "effect/unstable/rpc";
 import { describe, expect, it } from "vitest";
-import { Executor, Loader, Provider } from "../src/index.ts";
-
-class L extends Context.Service<L, Loader.Loader<string, string>>()("test/xreq/L") {}
+import { Executor, Provider } from "../src/index.ts";
 
 describe("cross-request isolation", () => {
-  it("gives each request its own loader cache and finalizes its scope", async () => {
+  it("sequential requests produce independent batches", async () => {
     const batches: Array<ReadonlyArray<string>> = [];
-    let finalizes = 0;
+
+    const loadLabel = Provider.batch(
+      "LoadLabel",
+      (payloads: ReadonlyArray<{ id: string }>) => {
+        batches.push(payloads.map((p) => p.id));
+        return payloads.map((p) => `v:${p.id}`);
+      },
+    );
 
     const provider = Provider.make({
       app: Layer.empty,
-      request: Layer.effect(L)(
-        Effect.gen(function*() {
-          yield* Effect.addFinalizer(() => Effect.sync(() => { finalizes++; }));
-          return yield* Loader.make((keys: ReadonlyArray<string>) =>
-            Effect.sync(() => {
-              batches.push(keys);
-              return keys.map((k) => `v:${k}`);
-            })
-          );
-        }),
-      ),
+      request: Layer.empty,
       query: {
         label: Provider.field({
           rpc: Rpc.make("label", { payload: { id: Schema.String }, success: Schema.String }),
-          resolve: ({ id }: { id: string }) =>
-            Effect.gen(function*() {
-              const loader = yield* L;
-              return yield* loader.load(id);
-            }),
+          resolve: ({ id }: { id: string }) => loadLabel({ id }),
         }),
       },
     });
@@ -42,9 +38,9 @@ describe("cross-request isolation", () => {
 
     expect(r1.data).toEqual({ label: "v:1" });
     expect(r2.data).toEqual({ label: "v:1" });
-    // a shared cache would batch only once; isolation => each request batches independently
+    // Two sequential requests → two separate batches (different event-loop ticks).
     expect(batches.length).toBe(2);
-    // each request's scope finalized
-    expect(finalizes).toBe(2);
+    expect(batches[0]).toEqual(["1"]);
+    expect(batches[1]).toEqual(["1"]);
   });
 });

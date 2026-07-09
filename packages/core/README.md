@@ -60,11 +60,9 @@ the resolvers depend on the runtime that `Executor.make` supplies via
 
 | Namespace | Purpose |
 |---|---|
-| `Provider` | Declare your API and reify transports: `make`, `field`, `augment`, `toSchema`, `serve`, `toRpcGroup`, `rpcHandlersLayer`, `rpcServerLayer` |
+| `Provider` | Declare your API and reify transports: `make`, `field`, `augment`, `toSchema`, `serve`, `toRpcGroup`, `rpcHandlersLayer` |
 | `Executor` | Materialize a Provider into a runnable executor: `make` |
-| `Loader` | Request-scoped tick-batched loader (DataLoader semantics): `make` |
 | `ProviderRequest` | Context service every request Layer can read; adapters populate `ProviderRequest.Fields` |
-
 `import { graphiql } from "effect-graphql/graphiql"` — subpath for the tree-shakable GraphiQL page.
 
 ## What it does
@@ -73,7 +71,7 @@ the resolvers depend on the runtime that `Executor.make` supplies via
 - Runs resolvers as `Effect<A, E, R>` inside a two-tier runtime (app-scoped services + a
   per-request context Layer built from headers/method/URL/body).
 - Types errors-as-data via result unions (ADR-0002).
-- Batches loads inside a request via `Loader.make` (ADR-0003).
+- Batches per-request lookups via Effect's `Request` + `RequestResolver` (ADR-0003).
 - Ships a `Provider.serve` HttpApp and a tree-shakable `graphiql` subpath.
 
 ## Ideas & roadmap

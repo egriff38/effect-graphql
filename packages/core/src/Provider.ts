@@ -16,13 +16,12 @@
  *
  * @since 0.1.0
  */
-import { Effect, Layer, Record as Rec, SchemaAST as AST } from "effect";
+import { Effect, Layer, Record as Rec, Request, RequestResolver, SchemaAST as AST } from "effect";
 import type { Schema } from "effect";
 import type { NoInfer } from "effect/Types";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-import type { HttpRouter } from "effect/unstable/http";
 import type { GraphQLSchema } from "graphql";
-import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { ProviderRequest } from "./ProviderRequest.ts";
 import { deriveSchema, type InternalAugment, type InternalField } from "./internal/derive.ts";
 import type { HardeningOptions } from "./internal/hardening.ts";
@@ -204,6 +203,109 @@ export const augment = <
     field: internalField,
   } as Augment<S, RPC, R>;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// batch — declare a batched loader in one shot
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A batched loader produced by {@link batch}. Call it with a payload from any
+ * resolver body; Effect coalesces concurrent same-tick calls into one
+ * `runAll` invocation. `.tag` and `.resolver` expose the underlying primitives
+ * for combinators (`RequestResolver.setDelay`, `batchN`, `withSpan`,
+ * `withCache`, `withPersistence`).
+ *
+ * @category models
+ * @since 0.3.0
+ */
+export interface BatchLoader<Tag extends string, Payload, Success> {
+  (payload: Payload): Effect.Effect<Success>;
+  readonly tag: Request.Constructor<
+    Request.Request<Success> & { readonly _tag: Tag } & Payload,
+    "_tag"
+  >;
+  readonly resolver: RequestResolver.RequestResolver<
+    Request.Request<Success> & { readonly _tag: Tag } & Payload
+  >;
+}
+
+/**
+ * Declare a batched lookup as a single callable value. Sugar over
+ * `Request.tagged` + `RequestResolver.fromFunctionBatched` that hides the
+ * interface + service-tag ceremony without hiding Effect's request scheduler.
+ *
+ * GraphQL resolvers routinely fan out into N calls to the same backend from
+ * one query. Declare a loader once; call it from any resolver body.
+ * Concurrent calls in the same fiber tree coalesce into one `runAll` batch.
+ *
+ * ## Form 1: string tag + inferred types
+ *
+ * ```ts
+ * // Tag, Payload, and Success all infer from the arguments.
+ * const loadUser = Provider.batch(
+ *   "LoadUser",
+ *   (payloads: ReadonlyArray<{ id: string }>) =>
+ *     payloads.map((p) => USERS.find((u) => u.id === p.id) ?? null),
+ * )
+ *
+ * const user = yield* loadUser({ id: "u1" })
+ * ```
+ *
+ * ## Form 2: from an existing `Rpc.make(...)` — types flow from the schema
+ *
+ * Pass an `Rpc` in place of the tag and payload/success are extracted from
+ * its schemas. No annotation needed on `runAll`.
+ *
+ * ```ts
+ * const UserRpc = Rpc.make("LoadUser", {
+ *   payload: { id: Schema.String },
+ *   success: User,
+ * })
+ *
+ * const loadUser = Provider.batch(
+ *   UserRpc,
+ *   (payloads) => payloads.map((p) => USERS.find((u) => u.id === p.id)!),
+ * )
+ * ```
+ *
+ * `runAll` receives the batch of payloads and MUST return the successes in
+ * the same order.
+ *
+ * For effectful batching (DB / service access), use the underlying primitives
+ * via `loader.tag` and `loader.resolver`, or drop to `Request.tagged` +
+ * `RequestResolver.make` directly.
+ *
+ * ```ts
+ * import { RequestResolver } from "effect"
+ * const cached = RequestResolver.withCache(loadUser.resolver)
+ * ```
+ *
+ * @category constructors
+ * @since 0.3.0
+ */
+export const batch: {
+  <const Tag extends string, Payload, Success>(
+    tag: Tag,
+    runAll: (payloads: ReadonlyArray<Payload>) => ReadonlyArray<Success>,
+  ): BatchLoader<Tag, Payload, Success>;
+  <R extends Rpc.Any>(
+    rpc: R,
+    runAll: (payloads: ReadonlyArray<Rpc.Payload<R>>) => ReadonlyArray<Rpc.Success<R>>,
+  ): BatchLoader<Rpc.Tag<R>, Rpc.Payload<R>, Rpc.Success<R>>;
+} = (<Payload, Success>(
+  tagOrRpc: string | Rpc.Any,
+  runAll: (payloads: ReadonlyArray<Payload>) => ReadonlyArray<Success>,
+) => {
+  const tag = typeof tagOrRpc === "string" ? tagOrRpc : (tagOrRpc as unknown as { _tag: string })._tag;
+  type Req = Request.Request<Success> & { readonly _tag: string } & Payload;
+  const Ctor = Request.tagged<Req>(tag as Req["_tag"]);
+  const resolver = RequestResolver.fromFunctionBatched<Req>(
+    (entries) => runAll(entries.map((e) => e.request)) as unknown as Iterable<Request.Success<Req>>,
+  );
+  const load = (payload: Payload): Effect.Effect<Success> =>
+    Effect.request(Ctor(payload as Parameters<typeof Ctor>[0]) as Req, resolver) as Effect.Effect<Success>;
+  return Object.assign(load, { tag: Ctor, resolver });
+}) as never;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider type + make — accumulates the union of every root op's RPC type
@@ -514,49 +616,3 @@ export const rpcHandlersLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
   return layer as unknown as Layer.Layer<Rpc.ToHandler<Rpcs>, E, never>;
 };
 
-/**
- * Layer that mounts an rpc server on `options.path`. Consumes `HttpRouter` from
- * the runtime; provides the handlers layer and JSON serialization internally.
- * Combine with an `HttpRouter` + `HttpServer` layer stack to serve the RPC
- * surface over HTTP.
- *
- * @example
- * import { Effect, Layer, Schema } from "effect"
- * import { Rpc } from "effect/unstable/rpc"
- * import { Provider } from "effect-graphql"
- *
- * class User extends Schema.Class<User>("User")({ id: Schema.String }) {}
- *
- * const provider = Provider.make({
- *   app: Layer.empty,
- *   request: Layer.empty,
- *   query: {
- *     me: Provider.field({
- *       rpc: Rpc.make("me", { success: User }),
- *       resolve: () => Effect.succeed(new User({ id: "u1" })),
- *     }),
- *   },
- * })
- * const server = Provider.rpcServerLayer(provider, { path: "/rpc" })
- *
- * @category destructors
- * @since 0.1.0
- */
-export const rpcServerLayer = <AppR, ReqR, E, Rpcs extends Rpc.Any>(
-  provider: Provider<AppR, ReqR, E, Rpcs>,
-  options: {
-    readonly path: HttpRouter.PathInput;
-    readonly protocol?: "http" | "websocket" | undefined;
-  },
-): Layer.Layer<
-  never,
-  E,
-  HttpRouter.HttpRouter | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>
-> =>
-  RpcServer.layerHttp({
-    group: toRpcGroup(provider),
-    path: options.path,
-    protocol: options.protocol ?? "http",
-  }).pipe(
-    Layer.provide([rpcHandlersLayer(provider), RpcSerialization.layerJson]),
-  );
