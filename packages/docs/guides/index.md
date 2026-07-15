@@ -10,6 +10,8 @@ Task-shaped walkthroughs for common `effect-graphql` work.
 
 ## How-to
 
+- [Authorize a field](/guides/authorization) — deny a resolver call and
+  surface the denial as a typed error union member.
 - [Batching](/guides/batching) — coalesce N+1 lookups with `Provider.batch`.
 - [Serving over HTTP](/guides/serving) — `Provider.serve`, GraphiQL,
   introspection hardening.

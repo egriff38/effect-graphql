@@ -41,6 +41,7 @@ export default defineConfig({
         {
           text: "How-to",
           items: [
+            { text: "Authorize a field", link: "/guides/authorization" },
             { text: "Batching", link: "/guides/batching" },
             { text: "Serving over HTTP", link: "/guides/serving" },
             { text: "Yoga, Apollo, Mercurius adapters", link: "/guides/adapters" },
