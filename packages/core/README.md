@@ -60,7 +60,7 @@ the resolvers depend on the runtime that `Executor.make` supplies via
 
 | Namespace | Purpose |
 |---|---|
-| `Provider` | Declare your API and reify transports: `make`, `field`, `augment`, `toSchema`, `serve`, `toRpcGroup`, `rpcHandlersLayer` |
+| `Provider` | Declare your API and reify transports: `make`, `field`, `augment`, `batch`, `toSchema`, `serve`, `toRpcGroup`, `rpcHandlersLayer` |
 | `Executor` | Materialize a Provider into a runnable executor: `make` |
 | `ProviderRequest` | Context service every request Layer can read; adapters populate `ProviderRequest.Fields` |
 `import { graphiql } from "effect-graphql/graphiql"` — subpath for the tree-shakable GraphiQL page.

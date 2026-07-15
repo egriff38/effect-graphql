@@ -33,7 +33,26 @@ export default defineConfig({
       "/guides/": [
         {
           text: "Getting started",
-          items: [{ text: "Quickstart", link: "/guides/quickstart" }],
+          items: [
+            { text: "Quickstart", link: "/guides/quickstart" },
+            { text: "Declare root operations", link: "/guides/root-operations" },
+          ],
+        },
+        {
+          text: "How-to",
+          items: [
+            { text: "Batching", link: "/guides/batching" },
+            { text: "Serving over HTTP", link: "/guides/serving" },
+            { text: "Yoga, Apollo, Mercurius adapters", link: "/guides/adapters" },
+          ],
+        },
+        {
+          text: "Concepts",
+          items: [
+            { text: "Types and augmentations", link: "/guides/types-vs-augmentations" },
+            { text: "Errors as data", link: "/guides/errors-as-data" },
+            { text: "Why Effect for GraphQL", link: "/guides/why-effect" },
+          ],
         },
       ],
     },

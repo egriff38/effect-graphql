@@ -22,3 +22,6 @@ packages/docs/.vitepress/dist
 styles/*
 !styles/AiSlop
 !styles/config
+
+# Scratch typecheck dirs used by docs-writing agents (isolated Twoslash verification)
+packages/docs/.check-errors
