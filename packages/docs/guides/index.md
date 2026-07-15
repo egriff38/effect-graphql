@@ -15,6 +15,8 @@ Task-shaped walkthroughs for common `effect-graphql` work.
 - [Batching](/guides/batching) — coalesce N+1 lookups with `Provider.batch`.
 - [Serving over HTTP](/guides/serving) — `Provider.serve`, GraphiQL,
   introspection hardening.
+- [Test a `Provider`](/guides/testing) — Vitest patterns for query,
+  schema, and HTTP shapes.
 - [Yoga, Apollo, Mercurius adapters](/guides/adapters) — plug
   `Provider.toSchema` into an existing GraphQL server.
 
