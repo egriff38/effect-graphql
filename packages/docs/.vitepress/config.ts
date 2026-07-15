@@ -22,42 +22,49 @@ export default defineConfig({
   title: "effect-graphql",
   description: "Derive a GraphQL API from Effect Schema types and Effect-based resolvers.",
   cleanUrls: true,
-  srcExclude: ["**/_templates/**", "**/_prompt.md", "**/README.md"],
+  // Served at effect-graphql.js.org/guides/. The docgen-rendered API reference
+  // lives at the domain root (Jekyll build); VitePress owns /guides/**.
+  base: "/guides/",
+  // Guide source is packages/docs/guides/**; nothing else in packages/docs is
+  // published. `_templates`, `_prompt.md`, and any README live outside srcDir
+  // and are automatically excluded.
+  srcDir: "guides",
   themeConfig: {
     nav: [
-      { text: "Guides", link: "/guides/" },
+      { text: "Guides", link: "/" },
       { text: "API Reference", link: "https://effect-graphql.js.org" },
       { text: "GitHub", link: "https://github.com/egriff38/effect-graphql" },
     ],
-    sidebar: {
-      "/guides/": [
-        {
-          text: "Getting started",
-          items: [
-            { text: "Quickstart", link: "/guides/quickstart" },
-            { text: "Declare root operations", link: "/guides/root-operations" },
-          ],
-        },
-        {
-          text: "How-to",
-          items: [
-            { text: "Authorize a field", link: "/guides/authorization" },
-            { text: "Batching", link: "/guides/batching" },
-            { text: "Serving over HTTP", link: "/guides/serving" },
-            { text: "Test a Provider", link: "/guides/testing" },
-            { text: "Yoga, Apollo, Mercurius adapters", link: "/guides/adapters" },
-          ],
-        },
-        {
-          text: "Concepts",
-          items: [
-            { text: "Types and augmentations", link: "/guides/types-vs-augmentations" },
-            { text: "Errors as data", link: "/guides/errors-as-data" },
-            { text: "Why Effect for GraphQL", link: "/guides/why-effect" },
-          ],
-        },
-      ],
-    },
+    // Sidebar links are absolute paths inside the guide tree — VitePress
+    // prepends `base` at deploy time, so `/quickstart` renders as
+    // `/guides/quickstart` on the site.
+    sidebar: [
+      {
+        text: "Getting started",
+        items: [
+          { text: "Quickstart", link: "/quickstart" },
+          { text: "Declare root operations", link: "/root-operations" },
+        ],
+      },
+      {
+        text: "How-to",
+        items: [
+          { text: "Authorize a field", link: "/authorization" },
+          { text: "Batching", link: "/batching" },
+          { text: "Serving over HTTP", link: "/serving" },
+          { text: "Test a Provider", link: "/testing" },
+          { text: "Yoga, Apollo, Mercurius adapters", link: "/adapters" },
+        ],
+      },
+      {
+        text: "Concepts",
+        items: [
+          { text: "Types and augmentations", link: "/types-vs-augmentations" },
+          { text: "Errors as data", link: "/errors-as-data" },
+          { text: "Why Effect for GraphQL", link: "/why-effect" },
+        ],
+      },
+    ],
   },
   markdown: {
     codeTransformers: [

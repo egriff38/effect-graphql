@@ -5,7 +5,7 @@ Add queries and mutations to a `Provider` with `Provider.field` and
 
 ## Prerequisites
 
-- You've completed the [Quickstart](/guides/quickstart).
+- You've completed the [Quickstart](/quickstart).
 - You have a `Schema.Class` for at least one type in your API.
 
 ## A query with no arguments
@@ -114,7 +114,7 @@ const provider = Provider.make({
 
 The generated SDL contains both a `Query` type and a `Mutation` type.
 Introspection is on by default in development; see [Serving over
-HTTP](/guides/serving) for how to gate it in production.
+HTTP](/serving) for how to gate it in production.
 
 ## Multiple root fields
 
@@ -219,7 +219,7 @@ const result = await executor.execute({
 
 ## Related
 
-- [Types and augmentations](/guides/types-vs-augmentations) — attach fields
+- [Types and augmentations](/types-vs-augmentations) — attach fields
   to types you've already declared.
-- [Errors as data](/guides/errors-as-data) — declare typed errors on an RPC
+- [Errors as data](/errors-as-data) — declare typed errors on an RPC
   and read them from the derived result union.

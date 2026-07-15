@@ -5,7 +5,7 @@ wiring a `Provider.batch` loader and invoking it from each resolver body.
 
 ## Prerequisites
 
-- You can [declare root operations](/guides/root-operations) with
+- You can [declare root operations](/root-operations) with
   `Provider.field` and `Rpc.make`.
 - Your query fans out — one root field returns a list, each item's
   augmentation looks up a related record by id.
@@ -238,9 +238,9 @@ entries with `label: "label:<id>"`.
 
 ## Related
 
-- [Declare root operations](/guides/root-operations) — the field shape the
+- [Declare root operations](/root-operations) — the field shape the
   augmentations extend.
-- [Types and augmentations](/guides/types-vs-augmentations) — where
+- [Types and augmentations](/types-vs-augmentations) — where
   `Provider.augment` fits alongside `Schema.Class` types.
 - [ADR 0003 — request-scoped tick-batched loaders](https://github.com/egriff38/effect-graphql/blob/master/packages/core/docs/adr/0003-request-scoped-tick-batched-loaders.md)
   — why the loader lives on `Provider` instead of a per-request layer.

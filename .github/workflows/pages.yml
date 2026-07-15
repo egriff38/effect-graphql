@@ -103,9 +103,19 @@ jobs:
 
           - [Provider](modules/Provider.ts.html) — declare an API, reify transports
           - [Executor](modules/Executor.ts.html) — materialize a Provider into a runtime
-          - [Loader](modules/Loader.ts.html) — request-scoped tick-batched loader
           - [ProviderRequest](modules/ProviderRequest.ts.html) — per-request Context service
           - [graphiql](modules/graphiql.ts.html) — tree-shakable GraphiQL page
+
+          ## Guides
+
+          Task-shaped walkthroughs for common `effect-graphql` work.
+
+          - [Guides index](guides/) — the full list.
+          - [Quickstart](guides/quickstart) — install, declare one query, run it.
+          - [Declare root operations](guides/root-operations) — queries and mutations.
+          - [Batching](guides/batching) — `Provider.batch` for N+1 lookups.
+          - [Serving over HTTP](guides/serving) — `Provider.serve` + GraphiQL.
+          - [Test a `Provider`](guides/testing) — Vitest patterns.
 
           ## Ecosystem
 
@@ -152,6 +162,22 @@ jobs:
         with:
           source: ./packages/core/docs
           destination: ./_site
+
+      - name: Build VitePress guides site
+        # VitePress is configured with `base: '/guides/'` and `srcDir: 'guides'`,
+        # so `packages/docs/guides/*.md` renders as a flat tree in
+        # `packages/docs/.vitepress/dist/`. We copy that tree into `_site/guides/`
+        # so Jekyll's API-reference site at `/` and the VitePress guides at
+        # `/guides/` share one deployed artifact.
+        run: bun --filter '@effect-graphql/docs' build
+
+      - name: Merge VitePress output into Jekyll site
+        run: |
+          # The Jekyll container wrote _site as root; take ownership so we can
+          # copy into it. Then merge the VitePress build under /guides/.
+          sudo chown -R "$(id -u):$(id -g)" _site
+          mkdir -p _site/guides
+          cp -r packages/docs/.vitepress/dist/. _site/guides/
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

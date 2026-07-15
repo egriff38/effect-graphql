@@ -125,7 +125,7 @@ const provider = Provider.make({
 
 The derived SDL contains `union UserResult = User | NotFound` and
 `user(id: String!): UserResult!`. Clients discriminate on `__typename`. See
-[Errors as data](/guides/errors-as-data) for how to read it.
+[Errors as data](/errors-as-data) for how to read it.
 
 ## When to pick this library
 
@@ -136,12 +136,12 @@ The derived SDL contains `union UserResult = User | NotFound` and
 - You want typed errors as GraphQL union members instead of an untyped
   `errors[]` array. The schema union and the resolver's `Effect.fail`
   channel share one `Rpc.make` declaration — see
-  [Errors as data](/guides/errors-as-data).
+  [Errors as data](/errors-as-data).
 - You need request-scoped DI. A `request` layer runs once per operation,
   and every resolver `Effect` sees the services it provides.
 - You need cross-resolver batching that respects the current request scope.
   `Provider.batch` collapses payloads inside a single request tick — see
-  [Batching with `Provider.batch`](/guides/batching).
+  [Batching with `Provider.batch`](/batching).
 - You're on `effect@4.0.0-beta.74` or later and any `graphql@16.x`.
 
 ## When to pick something else
@@ -163,8 +163,8 @@ The derived SDL contains `union UserResult = User | NotFound` and
 
 ## See also
 
-- [Quickstart](/guides/quickstart)
-- [Batching with `Provider.batch`](/guides/batching)
-- [Errors as data](/guides/errors-as-data)
-- [Serving over any HTTP adapter](/guides/adapters)
+- [Quickstart](/quickstart)
+- [Batching with `Provider.batch`](/batching)
+- [Errors as data](/errors-as-data)
+- [Serving over any HTTP adapter](/adapters)
 - [Spec wishlist — issue #23](https://github.com/egriff38/effect-graphql/issues/23)

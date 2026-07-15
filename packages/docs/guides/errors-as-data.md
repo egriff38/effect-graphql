@@ -147,5 +147,5 @@ Two properties fall out of encoding failures as data:
 
 ## See also
 
-- [Declare root operations](/guides/root-operations) — the `Provider.field` and `Rpc.make` primitives this page builds on.
+- [Declare root operations](/root-operations) — the `Provider.field` and `Rpc.make` primitives this page builds on.
 - [ADR 0002 — Typed errors as data; defects masked](https://github.com/egriff38/effect-graphql/blob/master/packages/core/docs/adr/0002-typed-errors-as-data.md) — the decision record and rejected alternatives in full.

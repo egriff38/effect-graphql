@@ -5,8 +5,8 @@ as a typed error union member.
 
 ## Prerequisites
 
-- You've completed the [Quickstart](/guides/quickstart).
-- You've read [Errors as data](/guides/errors-as-data) — the denied case is
+- You've completed the [Quickstart](/quickstart).
+- You've read [Errors as data](/errors-as-data) — the denied case is
   a member of the field's derived result union.
 
 ## Steps
@@ -217,9 +217,9 @@ not a transport failure.
 
 ## Related
 
-- [Errors as data](/guides/errors-as-data) — the shape of the derived result
+- [Errors as data](/errors-as-data) — the shape of the derived result
   union.
-- [Root operations](/guides/root-operations) — where `guards` sits on
+- [Root operations](/root-operations) — where `guards` sits on
   `Provider.field`.
-- [Serving over HTTP](/guides/serving) — how request headers reach
+- [Serving over HTTP](/serving) — how request headers reach
   `ProviderRequest`.

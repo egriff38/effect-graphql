@@ -5,7 +5,7 @@ add SDL and HTTP-level checks as needed.
 
 ## Prerequisites
 
-- You've completed the [Quickstart](/guides/quickstart).
+- You've completed the [Quickstart](/quickstart).
 - Vitest installed in your project.
 
 ## Steps
@@ -257,9 +257,9 @@ Snapshots live under `__snapshots__/`; regenerate with `-u`.
 
 ## Related
 
-- [Errors as data](/guides/errors-as-data) — the union member shape asserted
+- [Errors as data](/errors-as-data) — the union member shape asserted
   in step 2.
-- [Authorize a field](/guides/authorization) — the auth pattern the
+- [Authorize a field](/authorization) — the auth pattern the
   header-based tests exercise.
-- [Serving over HTTP](/guides/serving) — the transport the HTTP-shape
+- [Serving over HTTP](/serving) — the transport the HTTP-shape
   subprocess test exercises.

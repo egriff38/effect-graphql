@@ -120,9 +120,9 @@ the other.
 
 ## See also
 
-- [Declare root operations](/guides/root-operations) — the sibling case:
+- [Declare root operations](/root-operations) — the sibling case:
   fields on `Query` and `Mutation`.
-- [Batching](/guides/batching) — how augmentation resolvers avoid N+1 with
+- [Batching](/batching) — how augmentation resolvers avoid N+1 with
   `Provider.batch`.
 - [ADR 0004: annotation-driven type mapping](https://github.com/egriff38/effect-graphql/blob/master/packages/core/docs/adr/0004-annotation-driven-type-mapping.md)
   — the deriver rules that turn a `Schema.Class` into a GraphQL object

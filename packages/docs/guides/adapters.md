@@ -3,12 +3,12 @@
 Use `Provider.toSchema` for SDL and tooling; use `Executor.make(provider).execute`
 as the execution surface when you're mounting the API inside an existing Yoga,
 Apollo, or Mercurius server. The paved path is still
-[`Provider.serve`](/guides/serving) — reach for adapters only when the reader
+[`Provider.serve`](/serving) — reach for adapters only when the reader
 already runs one of those servers.
 
 ## Prerequisites
 
-- A `Provider` you've built with [`Provider.make`](/guides/root-operations).
+- A `Provider` you've built with [`Provider.make`](/root-operations).
 - Familiarity with the target adapter — this guide sketches the integration
   point, not the adapter itself.
 
@@ -168,7 +168,7 @@ if you want to help design one.
 
 ## Recommendation
 
-New project? Use [`Provider.serve`](/guides/serving). It's the paved path
+New project? Use [`Provider.serve`](/serving). It's the paved path
 and handles request Layer wiring, hardening, and the effect-platform
 `HttpApp` shape without an intermediate adapter.
 
@@ -209,8 +209,8 @@ console.log(sdl.startsWith("type Query"))
 
 ## Related
 
-- [Serving over HTTP](/guides/serving) — the paved path with `Provider.serve`.
-- [Declare root operations](/guides/root-operations) — build the `Provider`
+- [Serving over HTTP](/serving) — the paved path with `Provider.serve`.
+- [Declare root operations](/root-operations) — build the `Provider`
   that feeds `toSchema` and `Executor.make`.
-- [Why Effect for GraphQL](/guides/why-effect) — the two-tier runtime that
+- [Why Effect for GraphQL](/why-effect) — the two-tier runtime that
   makes `contextValue` load-bearing.

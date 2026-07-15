@@ -6,7 +6,7 @@ outside development.
 
 ## Prerequisites
 
-- A `Provider` — see [Declare root operations](/guides/root-operations) if you
+- A `Provider` — see [Declare root operations](/root-operations) if you
   haven't built one yet.
 - `@effect/platform-bun` installed (`bun add @effect/platform-bun`). The
   `@effect/platform-node` package binds the same router the same way.
@@ -141,9 +141,9 @@ curl -s http://localhost:3000/graphql \
 
 ## Related
 
-- [Errors as data](/guides/errors-as-data) — typed error union members surface
+- [Errors as data](/errors-as-data) — typed error union members surface
   through this endpoint the same way they surface through `Executor.execute`.
-- [Yoga, Apollo, Mercurius adapters](/guides/adapters) — skip `Provider.serve`
+- [Yoga, Apollo, Mercurius adapters](/adapters) — skip `Provider.serve`
   and hand `Provider.toSchema(provider)` to a different HTTP server.
-- [Declare root operations](/guides/root-operations) — the shape of the
+- [Declare root operations](/root-operations) — the shape of the
   `provider` this recipe mounts.
