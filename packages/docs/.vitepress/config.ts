@@ -11,6 +11,7 @@
  * the published package.
  */
 import { defineConfig } from "vitepress";
+import { withMermaid } from "vitepress-plugin-mermaid";
 import { transformerTwoslash } from "@shikijs/vitepress-twoslash";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -18,7 +19,7 @@ import { resolve } from "node:path";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const coreSrc = resolve(here, "..", "..", "core", "src");
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: "effect-graphql",
   description: "Derive a GraphQL API from Effect Schema types and Effect-based resolvers.",
   cleanUrls: true,
@@ -90,4 +91,4 @@ export default defineConfig({
       }) as never,
     ],
   },
-});
+}));

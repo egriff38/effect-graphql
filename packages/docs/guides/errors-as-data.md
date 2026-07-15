@@ -10,7 +10,7 @@ The result union mirrors `Exit<A, E>` one-to-one:
 
 ```mermaid
 flowchart LR
-  A["Effect&lt;A, E&gt;"] --> B{Exit}
+  A["Effect#lt;A, E#gt;"] --> B{Exit}
   B -->|Success a| C["union member: A (__typename = A._tag or Success wrapper)"]
   B -->|Fail e| D["union member: E (__typename = e._tag)"]
   B -->|Die / Interrupt| X["top-level errors[] (Cause, outside E)"]
